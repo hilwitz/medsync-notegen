@@ -1,9 +1,11 @@
 
 import { useEffect, useRef } from 'react';
 import { CustomButton } from './ui/CustomButton';
+import { Link, useNavigate } from 'react-router-dom';
 
 const LandingHero = () => {
   const animationRef = useRef<{ [key: string]: HTMLElement | null }>({});
+  const navigate = useNavigate();
 
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
@@ -70,12 +72,14 @@ const LandingHero = () => {
                 variant="primary" 
                 size="lg"
                 className="shadow-xl shadow-medsync-500/20 hover:shadow-medsync-600/20 transition-all"
+                onClick={() => navigate('/free-trial')}
               >
                 Start Free Trial
               </CustomButton>
               <CustomButton 
                 variant="outline" 
                 size="lg"
+                onClick={() => navigate('/watch-demo')}
               >
                 Watch Demo
               </CustomButton>

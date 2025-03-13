@@ -33,21 +33,39 @@ const NewConsultation = () => {
       }
       
       // First create or retrieve patient
-      const { data: patient, error: patientError } = await supabase
+      const { data: existingPatients, error: searchError } = await supabase
         .from('patients')
-        .upsert({
-          user_id: user.id,
-          first_name: patientFirstName,
-          last_name: patientLastName
-        }, {
-          onConflict: 'user_id, first_name, last_name',
-          returning: 'minimal'
-        })
         .select()
-        .single();
+        .eq('user_id', user.id)
+        .eq('first_name', patientFirstName)
+        .eq('last_name', patientLastName);
       
-      if (patientError) {
-        throw patientError;
+      if (searchError) {
+        throw searchError;
+      }
+      
+      let patientId;
+      
+      if (existingPatients && existingPatients.length > 0) {
+        // Use existing patient
+        patientId = existingPatients[0].id;
+      } else {
+        // Create new patient
+        const { data: newPatient, error: insertError } = await supabase
+          .from('patients')
+          .insert({
+            user_id: user.id,
+            first_name: patientFirstName,
+            last_name: patientLastName
+          })
+          .select()
+          .single();
+        
+        if (insertError) {
+          throw insertError;
+        }
+        
+        patientId = newPatient.id;
       }
       
       // Create new consultation
@@ -55,7 +73,7 @@ const NewConsultation = () => {
         .from('consultations')
         .insert({
           user_id: user.id,
-          patient_id: patient.id,
+          patient_id: patientId,
           note_type: noteType,
           status: 'scheduled'
         })

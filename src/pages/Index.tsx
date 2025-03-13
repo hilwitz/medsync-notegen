@@ -11,6 +11,13 @@ import { Play, Sparkles } from 'lucide-react';
 const Index = () => {
   const navigate = useNavigate();
 
+  const scrollToDemo = () => {
+    const demoSection = document.getElementById('demo');
+    if (demoSection) {
+      demoSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -29,7 +36,7 @@ const Index = () => {
             variant="outline" 
             size="lg"
             icon={<Play className="w-5 h-5" />}
-            onClick={() => navigate('/watch-demo')}
+            onClick={scrollToDemo}
           >
             Watch Demo
           </CustomButton>

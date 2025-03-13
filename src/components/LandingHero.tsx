@@ -47,6 +47,13 @@ const LandingHero = () => {
     };
   }, []);
 
+  const scrollToDemo = () => {
+    const demoSection = document.getElementById('demo');
+    if (demoSection) {
+      demoSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <section className="relative pt-32 pb-20 md:pt-40 md:pb-32 overflow-hidden">
       {/* Background elements */}
@@ -79,7 +86,7 @@ const LandingHero = () => {
               <CustomButton 
                 variant="outline" 
                 size="lg"
-                onClick={() => navigate('/watch-demo')}
+                onClick={scrollToDemo}
               >
                 Watch Demo
               </CustomButton>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CustomButton } from './ui/CustomButton';
@@ -62,16 +61,17 @@ const Header = () => {
 
   let navItems = [
     { name: 'Home', path: '/' },
-    { name: 'Features', path: '/#features' },
+    { name: 'Features', path: '/features' },
     { name: 'Demo', path: '/#demo' },
   ];
   
   // Add authenticated routes
   if (user) {
-    navItems.push(
+    navItems = [
+      { name: 'Home', path: '/' },
       { name: 'Dashboard', path: '/dashboard' },
       { name: 'New Consultation', path: '/consultations/new' }
-    );
+    ];
   }
 
   return (

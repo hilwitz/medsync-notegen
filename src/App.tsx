@@ -12,6 +12,7 @@ import NewConsultation from "./pages/NewConsultation";
 import ConsultationDetail from "./pages/ConsultationDetail";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Features from "./pages/Features";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,9 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/features" element={<Features />} />
+            <Route path="/free-trial" element={<Navigate to="/auth" />} />
+            <Route path="/watch-demo" element={<Navigate to="/#demo" />} />
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />

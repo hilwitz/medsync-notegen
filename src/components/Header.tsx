@@ -1,13 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CustomButton } from './ui/CustomButton';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -22,14 +28,51 @@ const Header = () => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  const isActive = (path: string) => location.pathname === path;
+  useEffect(() => {
+    // Check current auth state
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+      setLoading(false);
+    };
+    
+    checkUser();
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+        setLoading(false);
+      }
+    );
+    
+    return () => subscription.unsubscribe();
+  }, []);
 
-  const navItems = [
+  const isActive = (path: string) => location.pathname === path;
+  
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out"
+    });
+    navigate('/');
+  };
+
+  let navItems = [
     { name: 'Home', path: '/' },
     { name: 'Features', path: '/#features' },
     { name: 'Demo', path: '/#demo' },
-    { name: 'Dashboard', path: '/dashboard' },
   ];
+  
+  // Add authenticated routes
+  if (user) {
+    navItems.push(
+      { name: 'Dashboard', path: '/dashboard' },
+      { name: 'New Consultation', path: '/consultations/new' }
+    );
+  }
 
   return (
     <header 
@@ -64,13 +107,26 @@ const Header = () => {
         </nav>
 
         <div className="hidden md:flex items-center space-x-4">
-          <CustomButton 
-            variant="primary" 
-            size="md"
-            className="shadow-lg shadow-medsync-500/20 hover:shadow-medsync-600/20 transition-all"
-          >
-            Get Started
-          </CustomButton>
+          {!loading && (
+            user ? (
+              <CustomButton 
+                variant="outline" 
+                size="md"
+                onClick={handleLogout}
+              >
+                Log Out
+              </CustomButton>
+            ) : (
+              <CustomButton 
+                variant="primary" 
+                size="md"
+                className="shadow-lg shadow-medsync-500/20 hover:shadow-medsync-600/20 transition-all"
+                onClick={() => navigate('/auth')}
+              >
+                Log In
+              </CustomButton>
+            )
+          )}
         </div>
 
         {/* Mobile Menu Button */}
@@ -122,13 +178,27 @@ const Header = () => {
                   {item.name}
                 </Link>
               ))}
-              <CustomButton 
-                variant="primary" 
-                size="md"
-                className="mt-2 w-full shadow-lg shadow-medsync-500/20 hover:shadow-medsync-600/20 transition-all"
-              >
-                Get Started
-              </CustomButton>
+              {!loading && (
+                user ? (
+                  <CustomButton 
+                    variant="outline" 
+                    size="md"
+                    className="mt-2"
+                    onClick={handleLogout}
+                  >
+                    Log Out
+                  </CustomButton>
+                ) : (
+                  <CustomButton 
+                    variant="primary" 
+                    size="md"
+                    className="mt-2 w-full shadow-lg shadow-medsync-500/20 hover:shadow-medsync-600/20 transition-all"
+                    onClick={() => navigate('/auth')}
+                  >
+                    Log In
+                  </CustomButton>
+                )
+              )}
             </nav>
           </div>
         </div>

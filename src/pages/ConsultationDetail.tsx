@@ -135,7 +135,7 @@ const ConsultationDetail = () => {
       const { error } = await supabase
         .from('consultations')
         .update({
-          content,
+          content: content as Json,
           status: 'in_progress', // Update status when content is saved
           updated_at: new Date().toISOString()
         })
@@ -178,7 +178,7 @@ const ConsultationDetail = () => {
       const { error } = await supabase
         .from('consultations')
         .update({
-          content,
+          content: content as Json,
           status: 'completed',
           updated_at: new Date().toISOString()
         })

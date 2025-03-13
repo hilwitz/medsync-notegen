@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { Json } from '@/integrations/supabase/types';
 
 interface Patient {
   id: string;
@@ -21,6 +22,13 @@ interface Patient {
   medical_record_number?: string;
 }
 
+interface ConsultationContent {
+  subjective?: string;
+  objective?: string;
+  assessment?: string;
+  plan?: string;
+}
+
 interface Consultation {
   id: string;
   user_id: string;
@@ -28,12 +36,7 @@ interface Consultation {
   note_type: string;
   status: string;
   date: string;
-  content: {
-    subjective?: string;
-    objective?: string;
-    assessment?: string;
-    plan?: string;
-  } | null;
+  content: ConsultationContent | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,7 +49,7 @@ const ConsultationDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [consultation, setConsultation] = useState<Consultation | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [content, setContent] = useState<any>({
+  const [content, setContent] = useState<ConsultationContent>({
     subjective: '',
     objective: '',
     assessment: '',
@@ -79,14 +82,20 @@ const ConsultationDetail = () => {
           return;
         }
         
-        setConsultation(consultationData);
+        // Convert the raw JSON data to our Consultation type
+        const formattedConsultation: Consultation = {
+          ...consultationData,
+          content: typeof consultationData.content === 'object' ? consultationData.content as ConsultationContent : null
+        };
         
-        if (consultationData.content) {
+        setConsultation(formattedConsultation);
+        
+        if (formattedConsultation.content) {
           setContent({
-            subjective: consultationData.content.subjective || '',
-            objective: consultationData.content.objective || '',
-            assessment: consultationData.content.assessment || '',
-            plan: consultationData.content.plan || ''
+            subjective: formattedConsultation.content.subjective || '',
+            objective: formattedConsultation.content.objective || '',
+            assessment: formattedConsultation.content.assessment || '',
+            plan: formattedConsultation.content.plan || ''
           });
         }
         

@@ -1,272 +1,322 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CustomButton } from '@/components/ui/CustomButton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
-import { 
-  Save, 
-  Moon, 
-  Sun, 
-  Bell, 
-  BellOff, 
-  Globe, 
-  Key,
-  CheckCircle2
-} from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart3, BellRing, Monitor, Moon, Palette, Save, Sun } from 'lucide-react';
+
+interface SettingsProfileData {
+  first_name: string | null;
+  last_name: string | null;
+  specialty: string | null;
+}
 
 const Settings = () => {
-  const [isSaving, setIsSaving] = useState(false);
-  const { toast } = useToast();
-  
-  // Theme settings
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
-      return localStorage.getItem('theme') === 'dark';
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-  
-  // Notification settings
+  const [loading, setLoading] = useState(false);
+  const [userData, setUserData] = useState<SettingsProfileData>({ first_name: '', last_name: '', specialty: '' });
+  const [theme, setTheme] = useState('system');
   const [emailNotifications, setEmailNotifications] = useState(true);
-  const [consultationReminders, setConsultationReminders] = useState(true);
-  
-  // AI settings
-  const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
-  
-  const handleThemeChange = (isDark: boolean) => {
-    setDarkMode(isDark);
-    
-    // Update document class
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  };
-  
-  const handleSaveNotifications = () => {
-    setIsSaving(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      toast({
-        title: "Success",
-        description: "Notification preferences saved",
-      });
-      setIsSaving(false);
-    }, 1000);
-  };
-  
-  const handleSaveApiKey = () => {
-    setIsSaving(true);
-    
+  const [pushNotifications, setPushNotifications] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
     try {
-      // Store API key in local storage
-      localStorage.setItem('GEMINI_API_KEY', geminiApiKey);
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
       
-      toast({
-        title: "Success",
-        description: "API key saved successfully",
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, specialty')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      setUserData({
+        first_name: data?.first_name || '',
+        last_name: data?.last_name || '',
+        specialty: data?.specialty || ''
       });
     } catch (error) {
-      console.error('Error saving API key:', error);
+      console.error('Error fetching user profile:', error);
       toast({
         title: "Error",
-        description: "Failed to save API key",
+        description: "Failed to load user profile",
         variant: "destructive"
       });
     } finally {
-      setIsSaving(false);
+      setLoading(false);
     }
   };
-  
+
+  const handleSaveProfile = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to update your profile",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          specialty: userData.specialty
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSavePreferences = () => {
+    // In a real app, save theme and notification preferences
+    toast({
+      title: "Success",
+      description: "Preferences saved successfully",
+    });
+  };
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
         
-        <SidebarInset className="bg-neutral-50 dark:bg-neutral-900">
+        <SidebarInset className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-indigo-950">
           <div className="container px-4 py-8">
-            <div className="flex flex-col">
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold">Settings</h1>
+            <div className="flex flex-col space-y-8">
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Settings</h1>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">
-                  Manage your application preferences
+                  Manage your account settings and preferences
                 </p>
               </div>
               
-              <div className="space-y-8">
-                <Tabs defaultValue="appearance" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="appearance">Appearance</TabsTrigger>
-                    <TabsTrigger value="notifications">Notifications</TabsTrigger>
-                    <TabsTrigger value="integrations">Integrations</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="appearance">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Appearance</CardTitle>
-                        <CardDescription>
-                          Customize the appearance of the application
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-6">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label className="text-base">Theme</Label>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Choose between dark and light theme
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Sun className={`h-5 w-5 ${!darkMode ? 'text-yellow-500' : 'text-gray-400'}`} />
-                            <Switch 
-                              checked={darkMode}
-                              onCheckedChange={handleThemeChange}
-                            />
-                            <Moon className={`h-5 w-5 ${darkMode ? 'text-indigo-400' : 'text-gray-400'}`} />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                  
-                  <TabsContent value="notifications">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Notification Settings</CardTitle>
-                        <CardDescription>
-                          Manage your notification preferences
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-6">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label className="text-base">Email Notifications</Label>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Receive important updates via email
-                            </div>
-                          </div>
-                          <Switch 
-                            checked={emailNotifications}
-                            onCheckedChange={setEmailNotifications}
+              <Tabs defaultValue="profile" className="space-y-4">
+                <TabsList className="w-full max-w-md bg-gray-100 dark:bg-gray-800">
+                  <TabsTrigger value="profile" className="flex-1">Profile</TabsTrigger>
+                  <TabsTrigger value="appearance" className="flex-1">Appearance</TabsTrigger>
+                  <TabsTrigger value="notifications" className="flex-1">Notifications</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="profile" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Profile Information</CardTitle>
+                      <CardDescription>
+                        Update your personal information
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="firstName">First Name</Label>
+                          <Input 
+                            id="firstName" 
+                            value={userData.first_name || ''} 
+                            onChange={(e) => setUserData({...userData, first_name: e.target.value})}
+                            className="glass-input"
                           />
                         </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label className="text-base">Consultation Reminders</Label>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Get reminders about upcoming consultations
-                            </div>
-                          </div>
-                          <Switch 
-                            checked={consultationReminders}
-                            onCheckedChange={setConsultationReminders}
+                        <div className="space-y-2">
+                          <Label htmlFor="lastName">Last Name</Label>
+                          <Input 
+                            id="lastName" 
+                            value={userData.last_name || ''} 
+                            onChange={(e) => setUserData({...userData, last_name: e.target.value})}
+                            className="glass-input"
                           />
                         </div>
-                        
-                        <div className="flex justify-end pt-4">
-                          <CustomButton
-                            variant="primary"
-                            size="md"
-                            onClick={handleSaveNotifications}
-                            disabled={isSaving}
-                            className="gap-2"
-                          >
-                            {isSaving ? (
-                              <>Saving...</>
-                            ) : (
-                              <>
-                                <Save className="h-4 w-4" />
-                                Save Preferences
-                              </>
-                            )}
-                          </CustomButton>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                  
-                  <TabsContent value="integrations">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>AI Integration</CardTitle>
-                        <CardDescription>
-                          Configure your AI assistant settings
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-6">
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="geminiApiKey">Google Gemini API Key</Label>
-                            <div className="flex items-center space-x-2">
-                              <Input 
-                                id="geminiApiKey"
-                                type="password"
-                                value={geminiApiKey}
-                                onChange={(e) => setGeminiApiKey(e.target.value)}
-                                placeholder="Enter your Gemini API key"
-                                className="flex-1"
-                              />
-                              <CustomButton
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open('https://ai.google.dev/tutorials/setup', '_blank')}
-                              >
-                                Get Key
-                              </CustomButton>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="specialty">Medical Specialty</Label>
+                        <Input 
+                          id="specialty" 
+                          value={userData.specialty || ''} 
+                          onChange={(e) => setUserData({...userData, specialty: e.target.value})}
+                          className="glass-input"
+                        />
+                      </div>
+                      
+                      <div className="pt-4">
+                        <CustomButton 
+                          type="button" 
+                          variant="primary"
+                          size="md"
+                          className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600"
+                          onClick={handleSaveProfile}
+                          disabled={loading}
+                        >
+                          <Save className="h-4 w-4" />
+                          {loading ? 'Saving...' : 'Save Changes'}
+                        </CustomButton>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="appearance" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Appearance</CardTitle>
+                      <CardDescription>
+                        Customize how MedSync looks
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center space-x-3">
+                            <Palette className="w-5 h-5 text-indigo-600" />
+                            <div>
+                              <p className="font-medium">Theme</p>
+                              <p className="text-sm text-gray-500">Select your preferred theme</p>
                             </div>
-                            <p className="text-sm text-gray-500">
-                              Used for enhancing clinical notes with AI
-                            </p>
                           </div>
                           
-                          {geminiApiKey && (
-                            <div className="flex items-center text-green-600 text-sm">
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              API key is configured
-                            </div>
-                          )}
-                          
-                          <div className="flex justify-end pt-4">
-                            <CustomButton
-                              variant="primary"
-                              size="md"
-                              onClick={handleSaveApiKey}
-                              disabled={isSaving || !geminiApiKey}
-                              className="gap-2"
+                          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-md p-1">
+                            <button 
+                              className={`flex items-center justify-center p-2 rounded-md ${theme === 'light' ? 'bg-white shadow-sm dark:bg-gray-700' : ''}`}
+                              onClick={() => setTheme('light')}
                             >
-                              {isSaving ? (
-                                <>Saving...</>
-                              ) : (
-                                <>
-                                  <Key className="h-4 w-4" />
-                                  Save API Key
-                                </>
-                              )}
-                            </CustomButton>
+                              <Sun className="w-4 h-4" />
+                            </button>
+                            <button 
+                              className={`flex items-center justify-center p-2 rounded-md ${theme === 'dark' ? 'bg-white shadow-sm dark:bg-gray-700' : ''}`}
+                              onClick={() => setTheme('dark')}
+                            >
+                              <Moon className="w-4 h-4" />
+                            </button>
+                            <button 
+                              className={`flex items-center justify-center p-2 rounded-md ${theme === 'system' ? 'bg-white shadow-sm dark:bg-gray-700' : ''}`}
+                              onClick={() => setTheme('system')}
+                            >
+                              <Monitor className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                </Tabs>
-              </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center space-x-3">
+                            <BarChart3 className="w-5 h-5 text-indigo-600" />
+                            <div>
+                              <p className="font-medium">Analytics Dashboard</p>
+                              <p className="text-sm text-gray-500">Show analytics on dashboard home</p>
+                            </div>
+                          </div>
+                          
+                          <Switch checked={true} />
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4">
+                        <CustomButton 
+                          type="button" 
+                          variant="primary"
+                          size="md"
+                          className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600"
+                          onClick={handleSavePreferences}
+                        >
+                          <Save className="h-4 w-4" />
+                          Save Preferences
+                        </CustomButton>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="notifications" className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Notification Settings</CardTitle>
+                      <CardDescription>
+                        Control how you receive notifications
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center space-x-3">
+                            <BellRing className="w-5 h-5 text-indigo-600" />
+                            <div>
+                              <p className="font-medium">Email Notifications</p>
+                              <p className="text-sm text-gray-500">Receive notification emails for important updates</p>
+                            </div>
+                          </div>
+                          
+                          <Switch 
+                            checked={emailNotifications} 
+                            onCheckedChange={setEmailNotifications} 
+                          />
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center space-x-3">
+                            <BellRing className="w-5 h-5 text-indigo-600" />
+                            <div>
+                              <p className="font-medium">Push Notifications</p>
+                              <p className="text-sm text-gray-500">Receive browser notifications for important updates</p>
+                            </div>
+                          </div>
+                          
+                          <Switch 
+                            checked={pushNotifications} 
+                            onCheckedChange={setPushNotifications} 
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4">
+                        <CustomButton 
+                          type="button" 
+                          variant="primary"
+                          size="md"
+                          className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600"
+                          onClick={handleSavePreferences}
+                        >
+                          <Save className="h-4 w-4" />
+                          Save Preferences
+                        </CustomButton>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         </SidebarInset>

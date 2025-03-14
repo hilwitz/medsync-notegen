@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -106,14 +107,15 @@ const NewConsultation = () => {
         };
       }
       
-      // Create new consultation - use a valid status that matches the constraint
+      // Valid statuses according to the check constraint: 'scheduled', 'in_progress', 'completed'
+      // Create new consultation
       const { data: consultation, error: consultationError } = await supabase
         .from('consultations')
         .insert({
           user_id: user.id,
           patient_id: patientId,
           note_type: noteType,
-          status: 'in_progress', // Fixed to match the database constraint
+          status: 'scheduled', // Changed from 'in_progress' to 'scheduled' to match the constraint
           content: contentObj as Json,
           date: new Date().toISOString()
         })
@@ -523,7 +525,7 @@ const NewConsultation = () => {
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
         
-        <SidebarInset className="bg-neutral-50 dark:bg-neutral-900">
+        <SidebarInset className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-indigo-950">
           <div className="container px-4 py-12">
             {renderStep()}
           </div>

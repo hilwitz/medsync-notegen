@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CustomButton } from '@/components/ui/CustomButton';
-import { Search, Plus, User, Trash2, Edit2, EyeIcon } from 'lucide-react';
+import { Search, Plus, User, Trash2, Edit2, EyeIcon, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { 
   Select,
@@ -58,6 +68,8 @@ const Patients = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -174,6 +186,43 @@ const Patients = () => {
     }
   };
   
+  const openDeleteDialog = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setShowDeleteDialog(true);
+  };
+  
+  const handleDeletePatient = async () => {
+    if (!selectedPatient) return;
+    
+    try {
+      const { error } = await supabase
+        .from('patients')
+        .delete()
+        .eq('id', selectedPatient.id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Patient deleted successfully",
+      });
+      
+      // Update the local state
+      setPatients(patients.filter(p => p.id !== selectedPatient.id));
+      setShowDeleteDialog(false);
+      
+    } catch (error) {
+      console.error('Error deleting patient:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete patient. They may have associated consultations.",
+        variant: "destructive"
+      });
+    }
+  };
+  
   const handleViewPatient = (patientId: string) => {
     navigate(`/patients/${patientId}`);
   };
@@ -200,12 +249,12 @@ const Patients = () => {
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
         
-        <SidebarInset className="bg-neutral-50 dark:bg-neutral-900">
+        <SidebarInset className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-gray-900 dark:to-indigo-950">
           <div className="container px-4 py-8">
             <div className="flex flex-col">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h1 className="text-3xl font-bold">Patients</h1>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Patients</h1>
                   <p className="text-gray-500 dark:text-gray-400 mt-1">
                     Manage and view your patients
                   </p>
@@ -213,7 +262,11 @@ const Patients = () => {
                 
                 <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                   <DialogTrigger asChild>
-                    <CustomButton variant="primary" size="md" className="flex items-center gap-2">
+                    <CustomButton 
+                      variant="primary" 
+                      size="md" 
+                      className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                    >
                       <Plus size={16} />
                       Add Patient
                     </CustomButton>
@@ -234,6 +287,7 @@ const Patients = () => {
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
                           required
+                          className="border-indigo-200 focus:border-indigo-400"
                         />
                       </div>
                       
@@ -244,6 +298,7 @@ const Patients = () => {
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           required
+                          className="border-indigo-200 focus:border-indigo-400"
                         />
                       </div>
                       
@@ -254,6 +309,7 @@ const Patients = () => {
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
+                          className="border-indigo-200 focus:border-indigo-400"
                         />
                       </div>
                       
@@ -263,13 +319,14 @@ const Patients = () => {
                           id="phone"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
+                          className="border-indigo-200 focus:border-indigo-400"
                         />
                       </div>
                       
                       <div className="space-y-2">
                         <Label htmlFor="gender">Gender</Label>
                         <Select value={gender} onValueChange={setGender}>
-                          <SelectTrigger id="gender">
+                          <SelectTrigger id="gender" className="border-indigo-200 focus:border-indigo-400">
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
                           <SelectContent>
@@ -287,6 +344,7 @@ const Patients = () => {
                           type="date"
                           value={dob}
                           onChange={(e) => setDob(e.target.value)}
+                          className="border-indigo-200 focus:border-indigo-400"
                         />
                       </div>
                       
@@ -296,6 +354,7 @@ const Patients = () => {
                           id="mrn"
                           value={mrn}
                           onChange={(e) => setMrn(e.target.value)}
+                          className="border-indigo-200 focus:border-indigo-400"
                         />
                       </div>
                     </div>
@@ -305,6 +364,7 @@ const Patients = () => {
                         variant="outline" 
                         size="md"
                         onClick={() => setShowAddDialog(false)}
+                        className="border-indigo-200 hover:bg-indigo-50"
                       >
                         Cancel
                       </CustomButton>
@@ -312,6 +372,7 @@ const Patients = () => {
                         variant="primary" 
                         size="md"
                         onClick={handleAddPatient}
+                        className="bg-gradient-to-r from-indigo-500 to-purple-600"
                       >
                         Add Patient
                       </CustomButton>
@@ -320,7 +381,7 @@ const Patients = () => {
                 </Dialog>
               </div>
               
-              <Card>
+              <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-indigo-100 dark:border-indigo-900">
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-center">
                     <CardTitle>Patient List</CardTitle>
@@ -328,7 +389,7 @@ const Patients = () => {
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                       <Input
                         placeholder="Search patients..."
-                        className="pl-10"
+                        className="pl-10 border-indigo-200 focus:border-indigo-400"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
@@ -338,13 +399,13 @@ const Patients = () => {
                 <CardContent>
                   {isLoading ? (
                     <div className="py-10 text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-medsync-600 mx-auto"></div>
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
                       <p className="mt-4 text-gray-500">Loading patients...</p>
                     </div>
                   ) : filteredPatients.length > 0 ? (
-                    <div className="rounded-md border">
+                    <div className="rounded-md border border-indigo-100 dark:border-indigo-900 overflow-hidden">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-indigo-50 dark:bg-indigo-900/30">
                           <TableRow>
                             <TableHead>Name</TableHead>
                             <TableHead>MRN</TableHead>
@@ -356,7 +417,7 @@ const Patients = () => {
                         </TableHeader>
                         <TableBody>
                           {filteredPatients.map((patient) => (
-                            <TableRow key={patient.id}>
+                            <TableRow key={patient.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10">
                               <TableCell className="font-medium">
                                 {patient.first_name} {patient.last_name}
                               </TableCell>
@@ -377,24 +438,33 @@ const Patients = () => {
                                   <CustomButton
                                     variant="outline" 
                                     size="sm"
-                                    className="h-8 w-8 p-0" 
+                                    className="h-8 w-8 p-0 border-indigo-200 hover:bg-indigo-50" 
                                     onClick={() => handleViewPatient(patient.id)}
                                   >
-                                    <EyeIcon className="h-4 w-4" />
+                                    <EyeIcon className="h-4 w-4 text-indigo-600" />
                                     <span className="sr-only">View</span>
                                   </CustomButton>
                                   <CustomButton
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 w-8 p-0"
+                                    className="h-8 w-8 p-0 border-indigo-200 hover:bg-indigo-50"
                                     onClick={() => handleNewConsultation(
                                       patient.id, 
                                       patient.first_name, 
                                       patient.last_name
                                     )}
                                   >
-                                    <Plus className="h-4 w-4" />
+                                    <Plus className="h-4 w-4 text-indigo-600" />
                                     <span className="sr-only">New Consultation</span>
+                                  </CustomButton>
+                                  <CustomButton
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 border-red-200 hover:bg-red-50"
+                                    onClick={() => openDeleteDialog(patient)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                    <span className="sr-only">Delete</span>
                                   </CustomButton>
                                 </div>
                               </TableCell>
@@ -405,7 +475,7 @@ const Patients = () => {
                     </div>
                   ) : (
                     <div className="py-12 text-center">
-                      <User className="h-12 w-12 mx-auto text-gray-400" />
+                      <User className="h-12 w-12 mx-auto text-indigo-400 opacity-50" />
                       <h3 className="mt-4 text-lg font-medium">No patients found</h3>
                       <p className="mt-1 text-gray-500">
                         {searchTerm 
@@ -416,7 +486,7 @@ const Patients = () => {
                         <CustomButton
                           variant="primary"
                           size="md"
-                          className="mt-4"
+                          className="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600"
                           onClick={() => setShowAddDialog(true)}
                         >
                           <Plus className="mr-2 h-4 w-4" /> Add Patient
@@ -430,6 +500,31 @@ const Patients = () => {
           </div>
         </SidebarInset>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Confirm Deletion
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete patient "{selectedPatient?.first_name} {selectedPatient?.last_name}"? 
+              This action cannot be undone and will remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeletePatient}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 };

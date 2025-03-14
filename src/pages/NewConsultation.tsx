@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -107,14 +106,14 @@ const NewConsultation = () => {
         };
       }
       
-      // Create new consultation with properly formatted status
+      // Create new consultation - use a valid status that matches the constraint
       const { data: consultation, error: consultationError } = await supabase
         .from('consultations')
         .insert({
           user_id: user.id,
           patient_id: patientId,
           note_type: noteType,
-          status: 'in_progress', // Ensure this matches the constraint
+          status: 'in_progress', // Fixed to match the database constraint
           content: contentObj as Json,
           date: new Date().toISOString()
         })

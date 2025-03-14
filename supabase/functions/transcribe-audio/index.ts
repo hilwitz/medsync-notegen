@@ -56,31 +56,54 @@ serve(async (req) => {
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
     
-    // Prepare form data
-    const formData = new FormData();
-    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
-    formData.append('file', blob, 'audio.webm');
-    formData.append('model', 'whisper-1');
-
-    // Send to OpenAI for transcription
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    // Get API key from environment
+    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY');
+    if (!GOOGLE_API_KEY) {
+      throw new Error("Google API key not configured");
+    }
+    
+    // Convert audio to base64 for Google's API
+    const base64Audio = btoa(String.fromCharCode(...binaryAudio));
+    
+    // Call Google Speech-to-Text API
+    const response = await fetch(`https://speech.googleapis.com/v1/speech:recognize?key=${GOOGLE_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
       },
-      body: formData,
+      body: JSON.stringify({
+        config: {
+          encoding: 'WEBM_OPUS',
+          sampleRateHertz: 48000,
+          languageCode: 'en-US',
+          enableAutomaticPunctuation: true,
+          model: 'medical_conversation',
+          useEnhanced: true
+        },
+        audio: {
+          content: base64Audio
+        }
+      }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`OpenAI API error: ${errorText}`);
-      throw new Error(`Transcription service error: ${response.status}`);
+      console.error(`Google Speech API error: ${errorText}`);
+      throw new Error(`Speech recognition service error: ${response.status}`);
     }
 
     const result = await response.json();
+    
+    // Extract transcription from Google's response format
+    let transcription = "";
+    if (result.results && result.results.length > 0) {
+      transcription = result.results
+        .map((result: any) => result.alternatives[0].transcript)
+        .join(' ');
+    }
 
     return new Response(
-      JSON.stringify({ text: result.text }),
+      JSON.stringify({ text: transcription }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

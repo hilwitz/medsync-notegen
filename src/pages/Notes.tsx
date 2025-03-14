@@ -9,8 +9,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Search, Plus, Save, Trash2, Edit2, FileText } from 'lucide-react';
+import { Search, Plus, Save, Trash2, Edit2, FileText, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Note {
   id: string;
@@ -18,6 +28,7 @@ interface Note {
   content: string;
   created_at: string;
   updated_at: string;
+  user_id?: string;
 }
 
 const Notes = () => {
@@ -27,6 +38,7 @@ const Notes = () => {
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   // Form state
   const [title, setTitle] = useState('');
@@ -42,38 +54,33 @@ const Notes = () => {
     try {
       setIsLoading(true);
       
-      // For demonstration purposes, we're creating a simulated notes array
-      // In a real application, this would be fetched from Supabase
-      const simulatedNotes: Note[] = [
-        {
-          id: '1',
-          title: 'Patient Follow-up Protocol',
-          content: 'For chronic conditions, schedule follow-up every 3 months. For acute conditions, follow-up within 2 weeks. Always document patient compliance with treatment plan.',
-          created_at: '2023-06-15T10:30:00Z',
-          updated_at: '2023-06-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          title: 'Medication Reference',
-          content: 'Common dosages for hypertension medications:\n- Lisinopril: 10-40mg daily\n- Amlodipine: 2.5-10mg daily\n- Metoprolol: 25-100mg twice daily\n\nMonitor for side effects and adjust as needed.',
-          created_at: '2023-05-22T14:15:00Z',
-          updated_at: '2023-07-10T09:45:00Z'
-        },
-        {
-          id: '3',
-          title: 'Diabetes Management Guidelines',
-          content: 'Target HbA1c < 7.0% for most patients.\nCheck HbA1c every 3 months until stable, then every 6 months.\nScreen for complications annually:\n- Retinopathy\n- Nephropathy\n- Neuropathy\n- Foot exam',
-          created_at: '2023-04-03T11:20:00Z',
-          updated_at: '2023-08-01T16:30:00Z'
-        }
-      ];
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to view notes",
+          variant: "destructive"
+        });
+        return;
+      }
       
-      setNotes(simulatedNotes);
+      // Fetch notes from Supabase
+      const { data, error } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
       
-      if (simulatedNotes.length > 0) {
-        setActiveNote(simulatedNotes[0]);
-        setTitle(simulatedNotes[0].title);
-        setContent(simulatedNotes[0].content);
+      if (error) {
+        throw error;
+      }
+      
+      setNotes(data || []);
+      
+      if (data && data.length > 0) {
+        setActiveNote(data[0]);
+        setTitle(data[0].title);
+        setContent(data[0].content);
       }
       
     } catch (error) {
@@ -88,20 +95,52 @@ const Notes = () => {
     }
   };
   
-  const handleCreateNote = () => {
-    const newNote: Note = {
-      id: Math.random().toString(36).substring(7),
-      title: 'New Note',
-      content: '',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    
-    setNotes([newNote, ...notes]);
-    setActiveNote(newNote);
-    setTitle(newNote.title);
-    setContent(newNote.content);
-    setEditMode(true);
+  const handleCreateNote = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in to create notes",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const newNote = {
+        title: 'New Note',
+        content: '',
+        user_id: user.id
+      };
+      
+      const { data, error } = await supabase
+        .from('notes')
+        .insert(newNote)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      setNotes([data, ...notes]);
+      setActiveNote(data);
+      setTitle(data.title);
+      setContent(data.content);
+      setEditMode(true);
+      
+      toast({
+        title: "Success",
+        description: "New note created",
+      });
+    } catch (error) {
+      console.error('Error creating note:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create note",
+        variant: "destructive"
+      });
+    }
   };
   
   const handleSaveNote = async () => {
@@ -118,19 +157,27 @@ const Notes = () => {
     setIsSaving(true);
     
     try {
-      const updatedNote = {
-        ...activeNote,
-        title,
-        content,
-        updated_at: new Date().toISOString()
-      };
+      const { data, error } = await supabase
+        .from('notes')
+        .update({
+          title,
+          content,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', activeNote.id)
+        .select()
+        .single();
+      
+      if (error) {
+        throw error;
+      }
       
       // Update the notes array
       setNotes(notes.map(note => 
-        note.id === activeNote.id ? updatedNote : note
+        note.id === activeNote.id ? data : note
       ));
       
-      setActiveNote(updatedNote);
+      setActiveNote(data);
       setEditMode(false);
       
       toast({
@@ -149,14 +196,25 @@ const Notes = () => {
     }
   };
   
+  const openDeleteDialog = () => {
+    if (!activeNote) return;
+    setShowDeleteDialog(true);
+  };
+  
   const handleDeleteNote = async () => {
     if (!activeNote) return;
     
-    if (!confirm("Are you sure you want to delete this note?")) {
-      return;
-    }
-    
     try {
+      // Delete from Supabase
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', activeNote.id);
+      
+      if (error) {
+        throw error;
+      }
+      
       // Remove from notes array
       const filteredNotes = notes.filter(note => note.id !== activeNote.id);
       setNotes(filteredNotes);
@@ -173,6 +231,7 @@ const Notes = () => {
       }
       
       setEditMode(false);
+      setShowDeleteDialog(false);
       
       toast({
         title: "Success",
@@ -213,12 +272,12 @@ const Notes = () => {
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
         
-        <SidebarInset className="bg-neutral-50 dark:bg-neutral-900">
+        <SidebarInset className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-indigo-950">
           <div className="container px-4 py-8">
             <div className="flex flex-col">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h1 className="text-3xl font-bold">Notes</h1>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Notes</h1>
                   <p className="text-gray-500 dark:text-gray-400 mt-1">
                     Manage your clinical notes and references
                   </p>
@@ -227,7 +286,7 @@ const Notes = () => {
                 <CustomButton 
                   variant="primary" 
                   size="md"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   onClick={handleCreateNote}
                 >
                   <Plus size={16} />
@@ -237,13 +296,13 @@ const Notes = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-1">
-                  <Card className="h-full">
+                  <Card className="h-full shadow-md hover:shadow-lg transition-shadow duration-300 border-indigo-100 dark:border-indigo-900">
                     <CardHeader className="pb-3">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                         <Input
                           placeholder="Search notes..."
-                          className="pl-10"
+                          className="pl-10 border-indigo-200 focus:border-indigo-400 dark:border-indigo-800"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -252,7 +311,7 @@ const Notes = () => {
                     <CardContent>
                       {isLoading ? (
                         <div className="py-10 text-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-medsync-600 mx-auto"></div>
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
                           <p className="mt-4 text-gray-500">Loading notes...</p>
                         </div>
                       ) : filteredNotes.length > 0 ? (
@@ -261,9 +320,9 @@ const Notes = () => {
                             <div 
                               key={note.id}
                               className={`
-                                p-3 rounded-md cursor-pointer border
+                                p-3 rounded-md cursor-pointer border transition-all duration-200
                                 ${activeNote?.id === note.id 
-                                  ? 'bg-medsync-50 border-medsync-200 dark:bg-medsync-900/10 dark:border-medsync-800' 
+                                  ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800' 
                                   : 'hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700'
                                 }
                               `}
@@ -279,7 +338,7 @@ const Notes = () => {
                         </div>
                       ) : (
                         <div className="py-12 text-center">
-                          <FileText className="h-12 w-12 mx-auto text-gray-400" />
+                          <FileText className="h-12 w-12 mx-auto text-indigo-400 opacity-50" />
                           <h3 className="mt-4 text-lg font-medium">No notes found</h3>
                           <p className="mt-1 text-gray-500">
                             {searchTerm 
@@ -290,7 +349,7 @@ const Notes = () => {
                             <CustomButton
                               variant="primary"
                               size="md"
-                              className="mt-4"
+                              className="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600"
                               onClick={handleCreateNote}
                             >
                               <Plus className="mr-2 h-4 w-4" /> Create Note
@@ -303,7 +362,7 @@ const Notes = () => {
                 </div>
                 
                 <div className="md:col-span-2">
-                  <Card className="h-full flex flex-col">
+                  <Card className="h-full flex flex-col shadow-md hover:shadow-lg transition-shadow duration-300 border-indigo-100 dark:border-indigo-900">
                     <CardHeader className="pb-3 flex-shrink-0">
                       {activeNote ? (
                         <div className="flex justify-between items-center">
@@ -312,11 +371,11 @@ const Notes = () => {
                               <Input
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                className="text-xl font-bold"
+                                className="text-xl font-bold border-indigo-200 focus:border-indigo-400"
                                 placeholder="Note Title"
                               />
                             ) : (
-                              <CardTitle>{activeNote.title}</CardTitle>
+                              <CardTitle className="text-xl font-bold">{activeNote.title}</CardTitle>
                             )}
                             <CardDescription className="mt-1">
                               {!editMode && `Last updated: ${formatDate(activeNote.updated_at)}`}
@@ -329,7 +388,7 @@ const Notes = () => {
                                 size="sm"
                                 onClick={handleSaveNote}
                                 disabled={isSaving}
-                                className="gap-2"
+                                className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-600"
                               >
                                 {isSaving ? 'Saving...' : (
                                   <>
@@ -343,7 +402,7 @@ const Notes = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setEditMode(true)}
-                                className="gap-2"
+                                className="gap-2 border-indigo-200 hover:bg-indigo-50"
                               >
                                 <Edit2 className="h-4 w-4" />
                                 Edit
@@ -352,8 +411,8 @@ const Notes = () => {
                             <CustomButton
                               variant="destructive"
                               size="sm"
-                              onClick={handleDeleteNote}
-                              className="gap-2"
+                              onClick={openDeleteDialog}
+                              className="gap-2 bg-red-500 hover:bg-red-600"
                             >
                               <Trash2 className="h-4 w-4" />
                               Delete
@@ -370,11 +429,11 @@ const Notes = () => {
                           <Textarea 
                             value={content}
                             onChange={(e) => setContent(e.target.value)}
-                            className="min-h-[50vh] resize-none"
+                            className="min-h-[50vh] resize-none border-indigo-200 focus:border-indigo-400"
                             placeholder="Note content..."
                           />
                         ) : (
-                          <div className="whitespace-pre-line min-h-[50vh]">
+                          <div className="whitespace-pre-line min-h-[50vh] prose prose-indigo max-w-none">
                             {activeNote.content}
                           </div>
                         )
@@ -391,6 +450,30 @@ const Notes = () => {
           </div>
         </SidebarInset>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Confirm Deletion
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{activeNote?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteNote}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 };

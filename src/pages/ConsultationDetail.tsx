@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -23,13 +22,14 @@ import {
   TabsTrigger 
 } from '@/components/ui/tabs';
 import { Save, ArrowLeft, Sparkles } from 'lucide-react';
+import { Json } from '@/integrations/supabase/types';
 
-// Define types for content object
 interface SoapContent {
   subjective?: string;
   objective?: string;
   assessment?: string;
   plan?: string;
+  [key: string]: Json | undefined;
 }
 
 interface HPContent {
@@ -37,10 +37,12 @@ interface HPContent {
   physical_exam?: string;
   assessment?: string;
   plan?: string;
+  [key: string]: Json | undefined;
 }
 
 interface ProgressContent {
   progress_note?: string;
+  [key: string]: Json | undefined;
 }
 
 type ContentType = SoapContent | HPContent | ProgressContent;
@@ -56,19 +58,16 @@ const ConsultationDetail = () => {
   const [consultation, setConsultation] = useState<any>(null);
   const [patient, setPatient] = useState<any>(null);
   
-  // SOAP note state
   const [subjective, setSubjective] = useState('');
   const [objective, setObjective] = useState('');
   const [assessment, setAssessment] = useState('');
   const [plan, setPlan] = useState('');
   
-  // H&P state
   const [history, setHistory] = useState('');
   const [physicalExam, setPhysicalExam] = useState('');
   const [hpAssessment, setHpAssessment] = useState('');
   const [hpPlan, setHpPlan] = useState('');
   
-  // Progress note state
   const [progressNote, setProgressNote] = useState('');
   
   useEffect(() => {
@@ -78,7 +77,6 @@ const ConsultationDetail = () => {
       try {
         setIsLoading(true);
         
-        // Fetch consultation
         const { data: consultationData, error: consultationError } = await supabase
           .from('consultations')
           .select('*, patients(*)')
@@ -90,7 +88,6 @@ const ConsultationDetail = () => {
         setConsultation(consultationData);
         setPatient(consultationData.patients);
         
-        // Set form data based on note type
         if (consultationData.note_type === 'SOAP') {
           const content = consultationData.content as SoapContent || {};
           setSubjective(content.subjective || '');
@@ -104,7 +101,6 @@ const ConsultationDetail = () => {
           setHpAssessment(content.assessment || '');
           setHpPlan(content.plan || '');
         } else {
-          // Progress note
           const content = consultationData.content as ProgressContent || {};
           setProgressNote(content.progress_note || '');
         }
@@ -155,7 +151,7 @@ const ConsultationDetail = () => {
       const { error } = await supabase
         .from('consultations')
         .update({
-          content: contentObj,
+          content: contentObj as Json,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
@@ -179,7 +175,6 @@ const ConsultationDetail = () => {
   };
   
   const handleEnhanceWithAI = (section: 'subjective' | 'objective' | 'assessment' | 'plan' | 'history' | 'physical_exam' | 'hp_assessment' | 'hp_plan' | 'progress_note') => {
-    // Get current text based on section
     let currentText = '';
     
     switch (section) {
@@ -223,11 +218,9 @@ const ConsultationDetail = () => {
     
     setIsEnhancing(true);
     
-    // Simulate AI enhancement (replace with actual API call in production)
     setTimeout(() => {
       let enhancedText = `${currentText}\n\nAdditional clinical details: Patient's vital signs are stable. Examination reveals normal findings with no acute distress. Previous medical history has been considered in this assessment.`;
       
-      // Update the appropriate state based on section
       switch (section) {
         case 'subjective':
           setSubjective(enhancedText);

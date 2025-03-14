@@ -64,23 +64,34 @@ const Notes = () => {
         return;
       }
       
-      // Fetch notes from Supabase
+      // Fetch notes from Supabase - use consultations table with note_type="note"
       const { data, error } = await supabase
-        .from('notes')
+        .from('consultations')
         .select('*')
         .eq('user_id', user.id)
+        .eq('note_type', 'note')
         .order('updated_at', { ascending: false });
       
       if (error) {
         throw error;
       }
       
-      setNotes(data || []);
+      // Transform consultation data to match Note interface
+      const transformedNotes: Note[] = data?.map(consultation => ({
+        id: consultation.id,
+        title: consultation.content?.title || 'Untitled Note',
+        content: consultation.content?.text || '',
+        created_at: consultation.created_at,
+        updated_at: consultation.updated_at,
+        user_id: consultation.user_id
+      })) || [];
       
-      if (data && data.length > 0) {
-        setActiveNote(data[0]);
-        setTitle(data[0].title);
-        setContent(data[0].content);
+      setNotes(transformedNotes);
+      
+      if (transformedNotes.length > 0) {
+        setActiveNote(transformedNotes[0]);
+        setTitle(transformedNotes[0].title);
+        setContent(transformedNotes[0].content);
       }
       
     } catch (error) {
@@ -107,14 +118,20 @@ const Notes = () => {
         return;
       }
       
+      // Create a new note in the consultations table
       const newNote = {
-        title: 'New Note',
-        content: '',
-        user_id: user.id
+        user_id: user.id,
+        note_type: 'note',
+        patient_id: '00000000-0000-0000-0000-000000000000', // Using a placeholder UUID
+        status: 'completed',
+        content: {
+          title: 'New Note',
+          text: ''
+        }
       };
       
       const { data, error } = await supabase
-        .from('notes')
+        .from('consultations')
         .insert(newNote)
         .select()
         .single();
@@ -123,10 +140,20 @@ const Notes = () => {
         throw error;
       }
       
-      setNotes([data, ...notes]);
-      setActiveNote(data);
-      setTitle(data.title);
-      setContent(data.content);
+      // Transform to Note format
+      const transformedNote: Note = {
+        id: data.id,
+        title: data.content?.title || 'Untitled Note',
+        content: data.content?.text || '',
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        user_id: data.user_id
+      };
+      
+      setNotes([transformedNote, ...notes]);
+      setActiveNote(transformedNote);
+      setTitle(transformedNote.title);
+      setContent(transformedNote.content);
       setEditMode(true);
       
       toast({
@@ -157,11 +184,14 @@ const Notes = () => {
     setIsSaving(true);
     
     try {
+      // Update the consultation with the note content
       const { data, error } = await supabase
-        .from('notes')
+        .from('consultations')
         .update({
-          title,
-          content,
+          content: {
+            title: title,
+            text: content
+          },
           updated_at: new Date().toISOString()
         })
         .eq('id', activeNote.id)
@@ -172,12 +202,22 @@ const Notes = () => {
         throw error;
       }
       
+      // Transform updated data to Note format
+      const updatedNote: Note = {
+        id: data.id,
+        title: data.content?.title || 'Untitled Note',
+        content: data.content?.text || '',
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        user_id: data.user_id
+      };
+      
       // Update the notes array
       setNotes(notes.map(note => 
-        note.id === activeNote.id ? data : note
+        note.id === activeNote.id ? updatedNote : note
       ));
       
-      setActiveNote(data);
+      setActiveNote(updatedNote);
       setEditMode(false);
       
       toast({
@@ -207,7 +247,7 @@ const Notes = () => {
     try {
       // Delete from Supabase
       const { error } = await supabase
-        .from('notes')
+        .from('consultations')
         .delete()
         .eq('id', activeNote.id);
       

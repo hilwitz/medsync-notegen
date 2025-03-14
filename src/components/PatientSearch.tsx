@@ -72,11 +72,58 @@ const PatientSearch = () => {
   const handlePatientClick = (patientId: string) => {
     navigate(`/patients/${patientId}`);
     setShowResults(false);
+    setSearchTerm('');
+  };
+
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    // Auto-search if 2 or more characters
+    if (value.length >= 2) {
+      // Debounce function
+      const timeoutId = setTimeout(async () => {
+        try {
+          setIsSearching(true);
+          
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (!user) return;
+          
+          const { data, error } = await supabase
+            .from('patients')
+            .select('id, first_name, last_name')
+            .eq('user_id', user.id)
+            .or(`first_name.ilike.%${value}%,last_name.ilike.%${value}%`)
+            .order('last_name', { ascending: true })
+            .limit(10);
+          
+          if (error) throw error;
+          
+          setSearchResults(data || []);
+          setShowResults(true);
+        } catch (error) {
+          console.error('Search error:', error);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 300);
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      setShowResults(false);
+    }
   };
 
   const handleBlur = () => {
     // Delay hiding results to allow for clicks
     setTimeout(() => setShowResults(false), 200);
+  };
+
+  const handleFocus = () => {
+    if (searchTerm.length >= 2 && searchResults.length > 0) {
+      setShowResults(true);
+    }
   };
 
   return (
@@ -89,8 +136,8 @@ const PatientSearch = () => {
             placeholder="Search patients by name..."
             className="pl-10 pr-4 py-2 w-full"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onFocus={() => setShowResults(true)}
+            onChange={handleInputChange}
+            onFocus={handleFocus}
             onBlur={handleBlur}
           />
         </div>

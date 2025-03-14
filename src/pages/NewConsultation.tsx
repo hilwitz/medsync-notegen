@@ -11,6 +11,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Mic, Keyboard, ArrowRight, Sparkles } from 'lucide-react';
+import { Json } from '@/integrations/supabase/types';
+
+// We can move this to its own file later when refactoring
+interface GeminiResponse {
+  text: string;
+}
 
 const NewConsultation = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -80,7 +86,7 @@ const NewConsultation = () => {
       }
       
       // Create content object based on note type
-      let contentObj = {};
+      let contentObj: any = {};
       
       if (noteType === 'SOAP') {
         contentObj = {
@@ -110,7 +116,7 @@ const NewConsultation = () => {
           patient_id: patientId,
           note_type: noteType,
           status: 'in_progress',
-          content: contentObj
+          content: contentObj as Json
         })
         .select()
         .single();
@@ -139,7 +145,7 @@ const NewConsultation = () => {
     }
   };
 
-  const handleEnhanceWithAI = () => {
+  const handleEnhanceWithAI = async () => {
     if (!noteContent.trim()) {
       toast({
         title: "Error",
@@ -151,17 +157,76 @@ const NewConsultation = () => {
 
     setIsGeneratingWithAI(true);
     
-    // Simulate AI enhancement (replace with actual API call in production)
-    setTimeout(() => {
-      const enhancedContent = `Based on the patient's presentation, I've documented the following:\n\n${noteContent}\n\nAdditional clinical observations include normal vital signs with BP 120/80, HR 72, RR 16, Temp 98.6°F. Patient appears well-nourished and in no acute distress.`;
-      setNoteContent(enhancedContent);
-      setIsGeneratingWithAI(false);
+    try {
+      // Check if Gemini API key is in local storage
+      const apiKey = localStorage.getItem('GEMINI_API_KEY');
       
-      toast({
-        title: "Success!",
-        description: "Content enhanced with AI",
+      if (!apiKey) {
+        // Ask for API key if not found
+        const userApiKey = window.prompt("Please enter your Gemini API key to enhance content with AI:");
+        
+        if (!userApiKey) {
+          setIsGeneratingWithAI(false);
+          return;
+        }
+        
+        // Save API key for future use
+        localStorage.setItem('GEMINI_API_KEY', userApiKey);
+      }
+      
+      const currentApiKey = apiKey || localStorage.getItem('GEMINI_API_KEY');
+      
+      // Call Gemini API
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${currentApiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are a medical assistant helping a healthcare provider with their notes. Here's their initial note: "${noteContent}" 
+                  
+                  Please enhance this with more medical terminology and details, maintaining the same meaning but making it more professional. If the note mentions symptoms, add some possible normal vital signs or physical examination findings. Keep the length reasonable, no more than 2-3 paragraphs. Focus on making this sound like a professional medical note.`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 800,
+          }
+        })
       });
-    }, 2500);
+      
+      if (!response.ok) {
+        throw new Error(`Error calling Gemini API: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const enhancedContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      if (enhancedContent) {
+        setNoteContent(enhancedContent);
+        toast({
+          title: "Success!",
+          description: "Content enhanced with AI",
+        });
+      } else {
+        throw new Error("No content returned from Gemini API");
+      }
+    } catch (error) {
+      console.error("AI enhancement error:", error);
+      toast({
+        title: "AI Enhancement Failed",
+        description: error instanceof Error ? error.message : "Could not enhance content with AI",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingWithAI(false);
+    }
   };
   
   const renderStep = () => {

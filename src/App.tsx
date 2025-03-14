@@ -10,6 +10,10 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import NewConsultation from "./pages/NewConsultation";
 import ConsultationDetail from "./pages/ConsultationDetail";
+import Patients from "./pages/Patients";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import Notes from "./pages/Notes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Features from "./pages/Features";
@@ -71,22 +75,57 @@ const App = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/features" element={<Features />} />
             <Route path="/free-trial" element={<Navigate to="/auth" />} />
+            
+            {/* Protected Routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
             } />
+            
             <Route path="/consultations/new" element={
               <ProtectedRoute>
                 <NewConsultation />
               </ProtectedRoute>
             } />
+            
             <Route path="/consultations/:id" element={
               <ProtectedRoute>
                 <ConsultationDetail />
               </ProtectedRoute>
             } />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            
+            <Route path="/patients" element={
+              <ProtectedRoute>
+                <Patients />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/patients/:id" element={
+              <ProtectedRoute>
+                <Patients />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/notes" element={
+              <ProtectedRoute>
+                <Notes />
+              </ProtectedRoute>
+            } />
+            
+            {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

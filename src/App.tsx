@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -48,6 +49,17 @@ const App = () => {
     return <>{children}</>;
   };
 
+  // Check if user is logged in for root route
+  const HomeRoute = () => {
+    if (loading) return <div>Loading...</div>;
+    
+    if (session) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    
+    return <Index />;
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -55,7 +67,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<HomeRoute />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/features" element={<Features />} />
             <Route path="/free-trial" element={<Navigate to="/auth" />} />

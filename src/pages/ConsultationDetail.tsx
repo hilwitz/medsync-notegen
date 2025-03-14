@@ -1,123 +1,100 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import DashboardSidebar from '@/components/DashboardSidebar';
 import { supabase } from '@/integrations/supabase/client';
-import { CustomButton } from '@/components/ui/CustomButton';
 import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
+import { CustomButton } from '@/components/ui/CustomButton';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-import { Json } from '@/integrations/supabase/types';
-
-interface Patient {
-  id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth?: string;
-  gender?: string;
-  email?: string;
-  phone?: string;
-  medical_record_number?: string;
-}
-
-interface ConsultationContent {
-  subjective?: string;
-  objective?: string;
-  assessment?: string;
-  plan?: string;
-}
-
-interface Consultation {
-  id: string;
-  user_id: string;
-  patient_id: string;
-  note_type: string;
-  status: string;
-  date: string;
-  content: ConsultationContent | null;
-  created_at: string;
-  updated_at: string;
-}
+import { Label } from '@/components/ui/label';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from '@/components/ui/tabs';
+import { Save, ArrowLeft, Sparkles } from 'lucide-react';
 
 const ConsultationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [consultation, setConsultation] = useState<Consultation | null>(null);
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [content, setContent] = useState<ConsultationContent>({
-    subjective: '',
-    objective: '',
-    assessment: '',
-    plan: ''
-  });
-
-  // Fetch consultation and patient data
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [consultation, setConsultation] = useState<any>(null);
+  const [patient, setPatient] = useState<any>(null);
+  
+  // SOAP note state
+  const [subjective, setSubjective] = useState('');
+  const [objective, setObjective] = useState('');
+  const [assessment, setAssessment] = useState('');
+  const [plan, setPlan] = useState('');
+  
+  // H&P state
+  const [history, setHistory] = useState('');
+  const [physicalExam, setPhysicalExam] = useState('');
+  const [hpAssessment, setHpAssessment] = useState('');
+  const [hpPlan, setHpPlan] = useState('');
+  
+  // Progress note state
+  const [progressNote, setProgressNote] = useState('');
+  
   useEffect(() => {
     const fetchConsultation = async () => {
       if (!id) return;
       
       try {
+        setIsLoading(true);
+        
+        // Fetch consultation
         const { data: consultationData, error: consultationError } = await supabase
           .from('consultations')
-          .select('*')
+          .select('*, patients(*)')
           .eq('id', id)
           .single();
         
-        if (consultationError) {
-          throw consultationError;
+        if (consultationError) throw consultationError;
+        
+        setConsultation(consultationData);
+        setPatient(consultationData.patients);
+        
+        // Set form data based on note type
+        if (consultationData.note_type === 'SOAP') {
+          const content = consultationData.content || {};
+          setSubjective(content.subjective || '');
+          setObjective(content.objective || '');
+          setAssessment(content.assessment || '');
+          setPlan(content.plan || '');
+        } else if (consultationData.note_type === 'H&P') {
+          const content = consultationData.content || {};
+          setHistory(content.history || '');
+          setPhysicalExam(content.physical_exam || '');
+          setHpAssessment(content.assessment || '');
+          setHpPlan(content.plan || '');
+        } else {
+          // Progress note
+          const content = consultationData.content || {};
+          setProgressNote(content.progress_note || '');
         }
-        
-        if (!consultationData) {
-          toast({
-            title: "Not Found",
-            description: "Consultation not found",
-            variant: "destructive"
-          });
-          navigate('/dashboard');
-          return;
-        }
-        
-        // Convert the raw JSON data to our Consultation type
-        const formattedConsultation: Consultation = {
-          ...consultationData,
-          content: typeof consultationData.content === 'object' ? consultationData.content as ConsultationContent : null
-        };
-        
-        setConsultation(formattedConsultation);
-        
-        if (formattedConsultation.content) {
-          setContent({
-            subjective: formattedConsultation.content.subjective || '',
-            objective: formattedConsultation.content.objective || '',
-            assessment: formattedConsultation.content.assessment || '',
-            plan: formattedConsultation.content.plan || ''
-          });
-        }
-        
-        // Fetch patient info
-        const { data: patientData, error: patientError } = await supabase
-          .from('patients')
-          .select('*')
-          .eq('id', consultationData.patient_id)
-          .single();
-        
-        if (patientError) {
-          throw patientError;
-        }
-        
-        setPatient(patientData);
-      } catch (error: any) {
-        console.error('Error fetching data:', error);
+      } catch (error) {
+        console.error('Error fetching consultation:', error);
         toast({
           title: "Error",
-          description: error.message || "Failed to load consultation",
+          description: "Failed to load consultation details",
           variant: "destructive"
         });
+        navigate('/dashboard');
       } finally {
         setIsLoading(false);
       }
@@ -125,287 +102,485 @@ const ConsultationDetail = () => {
     
     fetchConsultation();
   }, [id, navigate, toast]);
-
-  // Save content changes
-  const saveConsultation = async () => {
+  
+  const handleSave = async () => {
     if (!consultation) return;
     
-    setIsSaving(true);
     try {
+      setIsSaving(true);
+      
+      let contentObj = {};
+      
+      if (consultation.note_type === 'SOAP') {
+        contentObj = {
+          subjective,
+          objective,
+          assessment,
+          plan
+        };
+      } else if (consultation.note_type === 'H&P') {
+        contentObj = {
+          history,
+          physical_exam: physicalExam,
+          assessment: hpAssessment,
+          plan: hpPlan
+        };
+      } else {
+        contentObj = {
+          progress_note: progressNote
+        };
+      }
+      
       const { error } = await supabase
         .from('consultations')
         .update({
-          content: content as Json,
-          status: 'in_progress', // Update status when content is saved
+          content: contentObj,
           updated_at: new Date().toISOString()
         })
-        .eq('id', consultation.id);
+        .eq('id', id);
       
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
       
       toast({
-        title: "Success",
-        description: "Consultation saved successfully"
+        title: "Saved",
+        description: "Consultation notes saved successfully"
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving consultation:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to save consultation",
+        description: "Failed to save changes",
         variant: "destructive"
       });
     } finally {
       setIsSaving(false);
     }
   };
-
-  // Handle content changes
-  const handleContentChange = (section: string, value: string) => {
-    setContent(prev => ({
-      ...prev,
-      [section]: value
-    }));
-  };
-
-  // Complete consultation
-  const completeConsultation = async () => {
-    if (!consultation) return;
+  
+  const handleEnhanceWithAI = (section: 'subjective' | 'objective' | 'assessment' | 'plan' | 'history' | 'physical_exam' | 'hp_assessment' | 'hp_plan' | 'progress_note') => {
+    // Get current text based on section
+    let currentText = '';
     
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('consultations')
-        .update({
-          content: content as Json,
-          status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', consultation.id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Success",
-        description: "Consultation completed successfully"
-      });
-      
-      // Navigate to dashboard
-      navigate('/dashboard');
-    } catch (error: any) {
-      console.error('Error completing consultation:', error);
+    switch (section) {
+      case 'subjective':
+        currentText = subjective;
+        break;
+      case 'objective':
+        currentText = objective;
+        break;
+      case 'assessment':
+        currentText = assessment;
+        break;
+      case 'plan':
+        currentText = plan;
+        break;
+      case 'history':
+        currentText = history;
+        break;
+      case 'physical_exam':
+        currentText = physicalExam;
+        break;
+      case 'hp_assessment':
+        currentText = hpAssessment;
+        break;
+      case 'hp_plan':
+        currentText = hpPlan;
+        break;
+      case 'progress_note':
+        currentText = progressNote;
+        break;
+    }
+    
+    if (!currentText.trim()) {
       toast({
         title: "Error",
-        description: error.message || "Failed to complete consultation",
+        description: "Please enter some content to enhance",
         variant: "destructive"
       });
-    } finally {
-      setIsSaving(false);
+      return;
     }
+    
+    setIsEnhancing(true);
+    
+    // Simulate AI enhancement (replace with actual API call in production)
+    setTimeout(() => {
+      let enhancedText = `${currentText}\n\nAdditional clinical details: Patient's vital signs are stable. Examination reveals normal findings with no acute distress. Previous medical history has been considered in this assessment.`;
+      
+      // Update the appropriate state based on section
+      switch (section) {
+        case 'subjective':
+          setSubjective(enhancedText);
+          break;
+        case 'objective':
+          setObjective(enhancedText);
+          break;
+        case 'assessment':
+          setAssessment(enhancedText);
+          break;
+        case 'plan':
+          setPlan(enhancedText);
+          break;
+        case 'history':
+          setHistory(enhancedText);
+          break;
+        case 'physical_exam':
+          setPhysicalExam(enhancedText);
+          break;
+        case 'hp_assessment':
+          setHpAssessment(enhancedText);
+          break;
+        case 'hp_plan':
+          setHpPlan(enhancedText);
+          break;
+        case 'progress_note':
+          setProgressNote(enhancedText);
+          break;
+      }
+      
+      setIsEnhancing(false);
+      
+      toast({
+        title: "Success!",
+        description: "Content enhanced with AI"
+      });
+    }, 2000);
   };
-
+  
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-medsync-600" />
-      </div>
+      <SidebarProvider defaultOpen={true}>
+        <div className="flex min-h-screen w-full">
+          <DashboardSidebar />
+          
+          <SidebarInset className="bg-neutral-50 dark:bg-neutral-900">
+            <div className="container py-12 flex justify-center items-center">
+              <div className="animate-spin h-8 w-8 border-4 border-medsync-600 border-t-transparent rounded-full"></div>
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
     );
   }
-
-  if (!consultation || !patient) {
+  
+  if (!consultation) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Consultation not found</h1>
-          <p className="mt-2 text-gray-600">The consultation you're looking for doesn't exist or you don't have access to it.</p>
-          <CustomButton
-            variant="primary"
-            size="md"
-            className="mt-4"
-            onClick={() => navigate('/dashboard')}
-          >
-            Return to Dashboard
-          </CustomButton>
+      <SidebarProvider defaultOpen={true}>
+        <div className="flex min-h-screen w-full">
+          <DashboardSidebar />
+          
+          <SidebarInset className="bg-neutral-50 dark:bg-neutral-900">
+            <div className="container py-12">
+              <div className="text-center">
+                <h1 className="text-2xl font-bold mb-4">Consultation not found</h1>
+                <CustomButton 
+                  variant="outline" 
+                  size="md" 
+                  onClick={() => navigate('/dashboard')}
+                >
+                  Return to Dashboard
+                </CustomButton>
+              </div>
+            </div>
+          </SidebarInset>
         </div>
-      </div>
+      </SidebarProvider>
     );
   }
-
-  const formattedDate = new Date(consultation.created_at).toLocaleDateString();
-  const formattedTime = new Date(consultation.created_at).toLocaleTimeString();
-
+  
   return (
-    <div className="container mx-auto px-4 py-12 max-w-5xl">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Consultation Details</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {formattedDate} at {formattedTime}
-          </p>
-        </div>
-        <div className="flex gap-4">
-          <CustomButton
-            variant="outline"
-            size="md"
-            onClick={() => navigate('/dashboard')}
-          >
-            Back to Dashboard
-          </CustomButton>
-          <CustomButton
-            variant="primary"
-            size="md"
-            onClick={saveConsultation}
-            disabled={isSaving}
-          >
-            {isSaving ? "Saving..." : "Save"}
-          </CustomButton>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-        <Card className="md:col-span-1">
-          <CardContent className="pt-6">
-            <h2 className="text-xl font-semibold mb-4">Patient Information</h2>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Name</p>
-                <p className="font-medium">{patient.first_name} {patient.last_name}</p>
-              </div>
-              
-              {patient.date_of_birth && (
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Date of Birth</p>
-                  <p className="font-medium">{new Date(patient.date_of_birth).toLocaleDateString()}</p>
-                </div>
-              )}
-              
-              {patient.gender && (
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Gender</p>
-                  <p className="font-medium">{patient.gender}</p>
-                </div>
-              )}
-              
-              {patient.email && (
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Email</p>
-                  <p className="font-medium">{patient.email}</p>
-                </div>
-              )}
-              
-              {patient.phone && (
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Phone</p>
-                  <p className="font-medium">{patient.phone}</p>
-                </div>
-              )}
-              
-              {patient.medical_record_number && (
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Medical Record #</p>
-                  <p className="font-medium">{patient.medical_record_number}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
-          <CardContent className="pt-6">
-            <h2 className="text-xl font-semibold mb-4">Consultation Details</h2>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Note Type</p>
-                  <p className="font-medium">{consultation.note_type}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
-                  <p className="font-medium capitalize">{consultation.status.replace('_', ' ')}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-lg p-6 mb-8">
-        <Tabs defaultValue="subjective" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="subjective">Subjective</TabsTrigger>
-            <TabsTrigger value="objective">Objective</TabsTrigger>
-            <TabsTrigger value="assessment">Assessment</TabsTrigger>
-            <TabsTrigger value="plan">Plan</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="subjective" className="space-y-4">
-            <h3 className="text-lg font-semibold">Subjective</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Record the patient's symptoms, complaints, and medical history as described by the patient.</p>
-            <Textarea 
-              value={content.subjective} 
-              onChange={(e) => handleContentChange('subjective', e.target.value)}
-              className="min-h-[200px]"
-              placeholder="Enter subjective information..."
-            />
-          </TabsContent>
-          
-          <TabsContent value="objective" className="space-y-4">
-            <h3 className="text-lg font-semibold">Objective</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Document measurable, observable data from the physical examination and diagnostic tests.</p>
-            <Textarea 
-              value={content.objective} 
-              onChange={(e) => handleContentChange('objective', e.target.value)}
-              className="min-h-[200px]"
-              placeholder="Enter objective findings..."
-            />
-          </TabsContent>
-          
-          <TabsContent value="assessment" className="space-y-4">
-            <h3 className="text-lg font-semibold">Assessment</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Provide your clinical assessment, diagnosis, or interpretation of the patient's condition.</p>
-            <Textarea 
-              value={content.assessment} 
-              onChange={(e) => handleContentChange('assessment', e.target.value)}
-              className="min-h-[200px]"
-              placeholder="Enter assessment information..."
-            />
-          </TabsContent>
-          
-          <TabsContent value="plan" className="space-y-4">
-            <h3 className="text-lg font-semibold">Plan</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Detail the treatment plan, medications, follow-up instructions, and referrals.</p>
-            <Textarea 
-              value={content.plan} 
-              onChange={(e) => handleContentChange('plan', e.target.value)}
-              className="min-h-[200px]"
-              placeholder="Enter treatment plan..."
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      <div className="flex justify-end space-x-4">
-        <CustomButton
-          variant="outline"
-          size="lg"
-          onClick={() => navigate('/dashboard')}
-        >
-          Cancel
-        </CustomButton>
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex min-h-screen w-full">
+        <DashboardSidebar />
         
-        <CustomButton
-          variant="primary"
-          size="lg"
-          onClick={completeConsultation}
-          disabled={isSaving}
-        >
-          {isSaving ? "Completing..." : "Complete Consultation"}
-        </CustomButton>
+        <SidebarInset className="bg-neutral-50 dark:bg-neutral-900">
+          <div className="container py-8 px-4">
+            <div className="mb-8">
+              <div className="flex items-center mb-2">
+                <CustomButton 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => navigate('/dashboard')}
+                  className="mr-2"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Back
+                </CustomButton>
+                <h1 className="text-2xl font-bold">{patient?.first_name} {patient?.last_name}</h1>
+              </div>
+              <div className="flex flex-wrap gap-4 items-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-medsync-100 dark:bg-medsync-900/30 text-medsync-700 dark:text-medsync-300">
+                  {consultation.note_type}
+                </span>
+                <span className="text-sm text-neutral-500">
+                  Created: {new Date(consultation.created_at).toLocaleString()}
+                </span>
+                <span className="text-sm text-neutral-500">
+                  Updated: {new Date(consultation.updated_at).toLocaleString()}
+                </span>
+              </div>
+            </div>
+            
+            <div className="mb-6 flex justify-end">
+              <CustomButton 
+                variant="primary" 
+                size="md" 
+                className="shadow-md"
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save'} <Save className="ml-2 h-4 w-4" />
+              </CustomButton>
+            </div>
+            
+            {consultation.note_type === 'SOAP' && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div>
+                      <CardTitle>Subjective</CardTitle>
+                      <CardDescription>Patient's symptoms, complaints, and history</CardDescription>
+                    </div>
+                    <CustomButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEnhanceWithAI('subjective')}
+                      disabled={isEnhancing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                    </CustomButton>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={subjective}
+                      onChange={(e) => setSubjective(e.target.value)}
+                      className="min-h-[150px]"
+                      placeholder="Enter subjective information..."
+                    />
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div>
+                      <CardTitle>Objective</CardTitle>
+                      <CardDescription>Physical examination findings and test results</CardDescription>
+                    </div>
+                    <CustomButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEnhanceWithAI('objective')}
+                      disabled={isEnhancing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                    </CustomButton>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={objective}
+                      onChange={(e) => setObjective(e.target.value)}
+                      className="min-h-[150px]"
+                      placeholder="Enter objective information..."
+                    />
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div>
+                      <CardTitle>Assessment</CardTitle>
+                      <CardDescription>Diagnosis and interpretation of findings</CardDescription>
+                    </div>
+                    <CustomButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEnhanceWithAI('assessment')}
+                      disabled={isEnhancing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                    </CustomButton>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={assessment}
+                      onChange={(e) => setAssessment(e.target.value)}
+                      className="min-h-[150px]"
+                      placeholder="Enter assessment..."
+                    />
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div>
+                      <CardTitle>Plan</CardTitle>
+                      <CardDescription>Treatment, follow-up, and management plan</CardDescription>
+                    </div>
+                    <CustomButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEnhanceWithAI('plan')}
+                      disabled={isEnhancing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                    </CustomButton>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={plan}
+                      onChange={(e) => setPlan(e.target.value)}
+                      className="min-h-[150px]"
+                      placeholder="Enter plan..."
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
+            {consultation.note_type === 'H&P' && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div>
+                      <CardTitle>History</CardTitle>
+                      <CardDescription>Patient's medical history and current complaints</CardDescription>
+                    </div>
+                    <CustomButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEnhanceWithAI('history')}
+                      disabled={isEnhancing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                    </CustomButton>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={history}
+                      onChange={(e) => setHistory(e.target.value)}
+                      className="min-h-[200px]"
+                      placeholder="Enter patient history..."
+                    />
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div>
+                      <CardTitle>Physical Examination</CardTitle>
+                      <CardDescription>Findings from physical examination</CardDescription>
+                    </div>
+                    <CustomButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEnhanceWithAI('physical_exam')}
+                      disabled={isEnhancing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                    </CustomButton>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={physicalExam}
+                      onChange={(e) => setPhysicalExam(e.target.value)}
+                      className="min-h-[200px]"
+                      placeholder="Enter physical exam findings..."
+                    />
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div>
+                      <CardTitle>Assessment</CardTitle>
+                      <CardDescription>Diagnosis and interpretation</CardDescription>
+                    </div>
+                    <CustomButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEnhanceWithAI('hp_assessment')}
+                      disabled={isEnhancing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                    </CustomButton>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={hpAssessment}
+                      onChange={(e) => setHpAssessment(e.target.value)}
+                      className="min-h-[150px]"
+                      placeholder="Enter assessment..."
+                    />
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <div>
+                      <CardTitle>Plan</CardTitle>
+                      <CardDescription>Treatment and follow-up plan</CardDescription>
+                    </div>
+                    <CustomButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEnhanceWithAI('hp_plan')}
+                      disabled={isEnhancing}
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                    </CustomButton>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={hpPlan}
+                      onChange={(e) => setHpPlan(e.target.value)}
+                      className="min-h-[150px]"
+                      placeholder="Enter plan..."
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
+            {consultation.note_type === 'Progress' && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div>
+                    <CardTitle>Progress Note</CardTitle>
+                    <CardDescription>Patient's progress and current status</CardDescription>
+                  </div>
+                  <CustomButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEnhanceWithAI('progress_note')}
+                    disabled={isEnhancing}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1" /> Enhance
+                  </CustomButton>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    value={progressNote}
+                    onChange={(e) => setProgressNote(e.target.value)}
+                    className="min-h-[400px]"
+                    placeholder="Enter progress note..."
+                  />
+                </CardContent>
+              </Card>
+            )}
+            
+            <div className="mt-6 flex justify-end">
+              <CustomButton 
+                variant="primary" 
+                size="md" 
+                className="shadow-md"
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save'} <Save className="ml-2 h-4 w-4" />
+              </CustomButton>
+            </div>
+          </div>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

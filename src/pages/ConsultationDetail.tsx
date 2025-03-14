@@ -24,6 +24,27 @@ import {
 } from '@/components/ui/tabs';
 import { Save, ArrowLeft, Sparkles } from 'lucide-react';
 
+// Define types for content object
+interface SoapContent {
+  subjective?: string;
+  objective?: string;
+  assessment?: string;
+  plan?: string;
+}
+
+interface HPContent {
+  history?: string;
+  physical_exam?: string;
+  assessment?: string;
+  plan?: string;
+}
+
+interface ProgressContent {
+  progress_note?: string;
+}
+
+type ContentType = SoapContent | HPContent | ProgressContent;
+
 const ConsultationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -71,20 +92,20 @@ const ConsultationDetail = () => {
         
         // Set form data based on note type
         if (consultationData.note_type === 'SOAP') {
-          const content = consultationData.content || {};
+          const content = consultationData.content as SoapContent || {};
           setSubjective(content.subjective || '');
           setObjective(content.objective || '');
           setAssessment(content.assessment || '');
           setPlan(content.plan || '');
         } else if (consultationData.note_type === 'H&P') {
-          const content = consultationData.content || {};
+          const content = consultationData.content as HPContent || {};
           setHistory(content.history || '');
           setPhysicalExam(content.physical_exam || '');
           setHpAssessment(content.assessment || '');
           setHpPlan(content.plan || '');
         } else {
           // Progress note
-          const content = consultationData.content || {};
+          const content = consultationData.content as ProgressContent || {};
           setProgressNote(content.progress_note || '');
         }
       } catch (error) {
@@ -109,7 +130,7 @@ const ConsultationDetail = () => {
     try {
       setIsSaving(true);
       
-      let contentObj = {};
+      let contentObj: ContentType = {};
       
       if (consultation.note_type === 'SOAP') {
         contentObj = {

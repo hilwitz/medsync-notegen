@@ -13,11 +13,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Mic, Keyboard, ArrowRight, Sparkles } from 'lucide-react';
 import { Json } from '@/integrations/supabase/types';
 
-// We can move this to its own file later when refactoring
-interface GeminiResponse {
-  text: string;
-}
-
 const NewConsultation = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<'select-type' | 'input-method' | 'create'>('select-type');
@@ -31,6 +26,10 @@ const NewConsultation = () => {
   const [inputMethod, setInputMethod] = useState<'text' | 'voice'>('text');
   const [noteContent, setNoteContent] = useState('');
   const [isGeneratingWithAI, setIsGeneratingWithAI] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,15 +107,16 @@ const NewConsultation = () => {
         };
       }
       
-      // Create new consultation
+      // Create new consultation with properly formatted status
       const { data: consultation, error: consultationError } = await supabase
         .from('consultations')
         .insert({
           user_id: user.id,
           patient_id: patientId,
           note_type: noteType,
-          status: 'in_progress',
-          content: contentObj as Json
+          status: 'in_progress', // Ensure this matches the constraint
+          content: contentObj as Json,
+          date: new Date().toISOString()
         })
         .select()
         .single();
@@ -158,64 +158,21 @@ const NewConsultation = () => {
     setIsGeneratingWithAI(true);
     
     try {
-      // Check if Gemini API key is in local storage
-      const apiKey = localStorage.getItem('GEMINI_API_KEY');
-      
-      if (!apiKey) {
-        // Ask for API key if not found
-        const userApiKey = window.prompt("Please enter your Gemini API key to enhance content with AI:");
-        
-        if (!userApiKey) {
-          setIsGeneratingWithAI(false);
-          return;
-        }
-        
-        // Save API key for future use
-        localStorage.setItem('GEMINI_API_KEY', userApiKey);
-      }
-      
-      const currentApiKey = apiKey || localStorage.getItem('GEMINI_API_KEY');
-      
-      // Call Gemini API
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${currentApiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are a medical assistant helping a healthcare provider with their notes. Here's their initial note: "${noteContent}" 
-                  
-                  Please enhance this with more medical terminology and details, maintaining the same meaning but making it more professional. If the note mentions symptoms, add some possible normal vital signs or physical examination findings. Keep the length reasonable, no more than 2-3 paragraphs. Focus on making this sound like a professional medical note.`
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 800,
-          }
-        })
+      // Call our backend function instead of requiring user API key
+      const { data, error } = await supabase.functions.invoke('enhance-medical-note', {
+        body: { content: noteContent, noteType }
       });
       
-      if (!response.ok) {
-        throw new Error(`Error calling Gemini API: ${response.statusText}`);
-      }
+      if (error) throw new Error(error.message);
       
-      const data = await response.json();
-      const enhancedContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
-      if (enhancedContent) {
-        setNoteContent(enhancedContent);
+      if (data?.enhancedContent) {
+        setNoteContent(data.enhancedContent);
         toast({
           title: "Success!",
           description: "Content enhanced with AI",
         });
       } else {
-        throw new Error("No content returned from Gemini API");
+        throw new Error("No content returned from AI service");
       }
     } catch (error) {
       console.error("AI enhancement error:", error);
@@ -226,6 +183,96 @@ const NewConsultation = () => {
       });
     } finally {
       setIsGeneratingWithAI(false);
+    }
+  };
+  
+  // Voice recording functionality
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setAudioStream(stream);
+      
+      const recorder = new MediaRecorder(stream);
+      setMediaRecorder(recorder);
+      
+      const chunks: Blob[] = [];
+      setAudioChunks(chunks);
+      
+      recorder.ondataavailable = (e) => {
+        chunks.push(e.data);
+      };
+      
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        
+        // Convert to base64 to send to backend
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result?.toString().split(',')[1];
+          
+          if (base64Audio) {
+            toast({
+              title: "Processing",
+              description: "Transcribing your recording...",
+            });
+            
+            try {
+              const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+                body: { audio: base64Audio }
+              });
+              
+              if (error) throw new Error(error.message);
+              
+              if (data?.text) {
+                setNoteContent(data.text);
+              } else {
+                throw new Error("No transcription returned");
+              }
+            } catch (error) {
+              console.error("Transcription error:", error);
+              toast({
+                title: "Transcription Failed",
+                description: error instanceof Error ? error.message : "Could not transcribe audio",
+                variant: "destructive"
+              });
+            }
+          }
+        };
+      };
+      
+      recorder.start();
+      setIsRecording(true);
+      
+      toast({
+        title: "Recording Started",
+        description: "Speak clearly into your microphone",
+      });
+      
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      toast({
+        title: "Error",
+        description: "Could not access microphone",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      
+      // Stop all audio tracks
+      if (audioStream) {
+        audioStream.getAudioTracks().forEach(track => track.stop());
+      }
+      
+      toast({
+        title: "Recording Stopped",
+        description: "Processing your audio...",
+      });
     }
   };
   
@@ -424,11 +471,18 @@ const NewConsultation = () => {
                   <div className="flex flex-col items-center justify-center space-y-4">
                     <button
                       type="button"
-                      className="p-6 rounded-full bg-medsync-100 hover:bg-medsync-200 transition-colors"
+                      className={`p-6 rounded-full transition-colors ${isRecording 
+                        ? 'bg-red-100 hover:bg-red-200 text-red-600 animate-pulse' 
+                        : 'bg-medsync-100 hover:bg-medsync-200 text-medsync-600'}`}
+                      onClick={isRecording ? stopRecording : startRecording}
                     >
-                      <Mic className="h-8 w-8 text-medsync-600" />
+                      <Mic className="h-8 w-8" />
                     </button>
-                    <p className="text-neutral-500">Click to start recording</p>
+                    <p className="text-neutral-500">
+                      {isRecording 
+                        ? 'Recording... Click to stop' 
+                        : 'Click to start recording'}
+                    </p>
                     
                     {noteContent && (
                       <div className="w-full mt-4 p-4 border rounded-md bg-neutral-50 dark:bg-neutral-800/50">

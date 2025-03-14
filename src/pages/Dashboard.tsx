@@ -13,7 +13,7 @@ interface Consultation {
   id: string;
   patientName: string;
   date: string;
-  status: 'completed' | 'in-progress' | 'scheduled';
+  status: 'completed' | 'in_progress' | 'scheduled';
   noteType: 'SOAP' | 'H&P' | 'Progress';
 }
 
@@ -22,6 +22,11 @@ const Dashboard = () => {
   const [userName, setUserName] = useState('');
   const [recentConsultations, setRecentConsultations] = useState<Consultation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    todayCount: 0,
+    pendingCount: 0,
+    completedCount: 0
+  });
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -56,7 +61,11 @@ const Dashboard = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch consultations from Supabase
+        // Get today's date at midnight for comparison
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Fetch all consultations to calculate stats and recent ones
         const { data: consultationsData, error } = await supabase
           .from('consultations')
           .select(`
@@ -64,25 +73,47 @@ const Dashboard = () => {
             note_type, 
             status, 
             date, 
+            created_at,
             patients(first_name, last_name)
           `)
           .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10);
+          .order('created_at', { ascending: false });
 
         if (error) throw error;
 
         if (consultationsData) {
-          // Transform the data for display
-          const formattedConsultations: Consultation[] = consultationsData.map(consult => ({
-            id: consult.id,
-            patientName: consult.patients ? 
-              `${consult.patients.first_name} ${consult.patients.last_name}` : 
-              'Unknown Patient',
-            date: new Date(consult.date).toLocaleString(),
-            status: mapStatus(consult.status),
-            noteType: consult.note_type as 'SOAP' | 'H&P' | 'Progress'
-          }));
+          // Calculate stats
+          const todayConsultations = consultationsData.filter(consult => {
+            const consultDate = new Date(consult.date);
+            return consultDate >= today;
+          });
+          
+          const pendingConsultations = consultationsData.filter(consult => 
+            consult.status === 'in_progress'
+          );
+          
+          const completedConsultations = consultationsData.filter(consult => 
+            consult.status === 'completed'
+          );
+          
+          setStats({
+            todayCount: todayConsultations.length,
+            pendingCount: pendingConsultations.length,
+            completedCount: completedConsultations.length
+          });
+
+          // Format the most recent 10 consultations for display
+          const formattedConsultations: Consultation[] = consultationsData
+            .slice(0, 10)
+            .map(consult => ({
+              id: consult.id,
+              patientName: consult.patients ? 
+                `${consult.patients.first_name} ${consult.patients.last_name}` : 
+                'Unknown Patient',
+              date: new Date(consult.date).toLocaleString(),
+              status: mapStatus(consult.status),
+              noteType: consult.note_type as 'SOAP' | 'H&P' | 'Progress'
+            }));
 
           setRecentConsultations(formattedConsultations);
         }
@@ -103,10 +134,10 @@ const Dashboard = () => {
   }, [toast]);
 
   // Map Supabase status to our UI status
-  const mapStatus = (status: string): 'completed' | 'in-progress' | 'scheduled' => {
-    const statusMap: Record<string, 'completed' | 'in-progress' | 'scheduled'> = {
+  const mapStatus = (status: string): 'completed' | 'in_progress' | 'scheduled' => {
+    const statusMap: Record<string, 'completed' | 'in_progress' | 'scheduled'> = {
       'completed': 'completed',
-      'in_progress': 'in-progress',
+      'in_progress': 'in_progress',
       'scheduled': 'scheduled'
     };
     return statusMap[status] || 'scheduled';
@@ -122,7 +153,7 @@ const Dashboard = () => {
 
   const statusColor = {
     'completed': 'bg-green-500',
-    'in-progress': 'bg-yellow-500',
+    'in_progress': 'bg-yellow-500',
     'scheduled': 'bg-neutral-400'
   };
 
@@ -161,9 +192,9 @@ const Dashboard = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {[
-                { title: 'Today\'s Consultations', value: '4', icon: 'calendar' },
-                { title: 'Pending Notes', value: '2', icon: 'document' },
-                { title: 'Completed Notes', value: '135', icon: 'check' }
+                { title: 'Today\'s Consultations', value: stats.todayCount.toString(), icon: 'calendar' },
+                { title: 'Pending Notes', value: stats.pendingCount.toString(), icon: 'document' },
+                { title: 'Completed Notes', value: stats.completedCount.toString(), icon: 'check' }
               ].map((stat, index) => (
                 <div key={index} className="glass-card p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
                   <div className="flex items-center justify-between">

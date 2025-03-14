@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Json } from '@/integrations/supabase/types';
 
 interface Note {
   id: string;
@@ -29,6 +30,12 @@ interface Note {
   created_at: string;
   updated_at: string;
   user_id?: string;
+}
+
+// Define a type for the content structure
+interface NoteContent {
+  title: string;
+  text: string;
 }
 
 const Notes = () => {
@@ -77,14 +84,19 @@ const Notes = () => {
       }
       
       // Transform consultation data to match Note interface
-      const transformedNotes: Note[] = data?.map(consultation => ({
-        id: consultation.id,
-        title: consultation.content?.title || 'Untitled Note',
-        content: consultation.content?.text || '',
-        created_at: consultation.created_at,
-        updated_at: consultation.updated_at,
-        user_id: consultation.user_id
-      })) || [];
+      const transformedNotes: Note[] = data?.map(consultation => {
+        // Safely handle the JSON content field
+        const noteContent = consultation.content as NoteContent | null;
+        
+        return {
+          id: consultation.id,
+          title: noteContent?.title || 'Untitled Note',
+          content: noteContent?.text || '',
+          created_at: consultation.created_at,
+          updated_at: consultation.updated_at,
+          user_id: consultation.user_id
+        };
+      }) || [];
       
       setNotes(transformedNotes);
       
@@ -140,11 +152,13 @@ const Notes = () => {
         throw error;
       }
       
-      // Transform to Note format
+      // Transform to Note format - handle JSON content safely
+      const noteContent = data.content as NoteContent | null;
+      
       const transformedNote: Note = {
         id: data.id,
-        title: data.content?.title || 'Untitled Note',
-        content: data.content?.text || '',
+        title: noteContent?.title || 'Untitled Note',
+        content: noteContent?.text || '',
         created_at: data.created_at,
         updated_at: data.updated_at,
         user_id: data.user_id
@@ -202,11 +216,13 @@ const Notes = () => {
         throw error;
       }
       
-      // Transform updated data to Note format
+      // Transform updated data to Note format - handle JSON content safely
+      const noteContent = data.content as NoteContent | null;
+      
       const updatedNote: Note = {
         id: data.id,
-        title: data.content?.title || 'Untitled Note',
-        content: data.content?.text || '',
+        title: noteContent?.title || 'Untitled Note',
+        content: noteContent?.text || '',
         created_at: data.created_at,
         updated_at: data.updated_at,
         user_id: data.user_id

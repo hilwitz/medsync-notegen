@@ -38,6 +38,29 @@ interface NoteContent {
   text: string;
 }
 
+// Helper function to safely convert Json to NoteContent
+const parseNoteContent = (jsonContent: Json | null): NoteContent => {
+  if (!jsonContent) {
+    return { title: 'Untitled Note', text: '' };
+  }
+  
+  // Check if jsonContent is an object with the expected properties
+  if (
+    typeof jsonContent === 'object' && 
+    jsonContent !== null &&
+    !Array.isArray(jsonContent) &&
+    'title' in jsonContent &&
+    'text' in jsonContent
+  ) {
+    return {
+      title: String(jsonContent.title || 'Untitled Note'),
+      text: String(jsonContent.text || '')
+    };
+  }
+  
+  return { title: 'Untitled Note', text: '' };
+};
+
 const Notes = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,13 +108,13 @@ const Notes = () => {
       
       // Transform consultation data to match Note interface
       const transformedNotes: Note[] = data?.map(consultation => {
-        // Safely handle the JSON content field
-        const noteContent = consultation.content as NoteContent | null;
+        // Safely handle the JSON content field using our helper function
+        const noteContent = parseNoteContent(consultation.content);
         
         return {
           id: consultation.id,
-          title: noteContent?.title || 'Untitled Note',
-          content: noteContent?.text || '',
+          title: noteContent.title,
+          content: noteContent.text,
           created_at: consultation.created_at,
           updated_at: consultation.updated_at,
           user_id: consultation.user_id
@@ -152,13 +175,13 @@ const Notes = () => {
         throw error;
       }
       
-      // Transform to Note format - handle JSON content safely
-      const noteContent = data.content as NoteContent | null;
+      // Transform to Note format using our helper function
+      const noteContent = parseNoteContent(data.content);
       
       const transformedNote: Note = {
         id: data.id,
-        title: noteContent?.title || 'Untitled Note',
-        content: noteContent?.text || '',
+        title: noteContent.title,
+        content: noteContent.text,
         created_at: data.created_at,
         updated_at: data.updated_at,
         user_id: data.user_id
@@ -216,13 +239,13 @@ const Notes = () => {
         throw error;
       }
       
-      // Transform updated data to Note format - handle JSON content safely
-      const noteContent = data.content as NoteContent | null;
+      // Transform updated data to Note format using our helper function
+      const noteContent = parseNoteContent(data.content);
       
       const updatedNote: Note = {
         id: data.id,
-        title: noteContent?.title || 'Untitled Note',
-        content: noteContent?.text || '',
+        title: noteContent.title,
+        content: noteContent.text,
         created_at: data.created_at,
         updated_at: data.updated_at,
         user_id: data.user_id

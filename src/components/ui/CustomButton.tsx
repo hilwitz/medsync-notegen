@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface CustomButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   icon?: React.ReactNode;
@@ -27,7 +27,8 @@ const CustomButton = React.forwardRef<HTMLButtonElement, CustomButtonProps>(
       primary: 'bg-medsync-600 hover:bg-medsync-700 text-white shadow-sm',
       secondary: 'bg-neutral-100 hover:bg-neutral-200 text-neutral-900 shadow-sm',
       outline: 'bg-transparent border border-medsync-600 text-medsync-600 hover:bg-medsync-50',
-      ghost: 'bg-transparent hover:bg-neutral-100 text-neutral-900'
+      ghost: 'bg-transparent hover:bg-neutral-100 text-neutral-900',
+      destructive: 'bg-red-600 hover:bg-red-700 text-white shadow-sm'
     };
     
     const sizeStyles = {

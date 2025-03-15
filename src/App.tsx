@@ -18,7 +18,6 @@ import Notes from "./pages/Notes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Features from "./pages/Features";
-import { SidebarOpener } from "./components/SidebarOpener";
 
 const queryClient = new QueryClient();
 

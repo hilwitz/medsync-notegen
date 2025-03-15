@@ -1,222 +1,199 @@
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import DashboardSidebar from '@/components/DashboardSidebar';
-import { SidebarOpener } from '@/components/SidebarOpener';
-import { supabase } from '@/integrations/supabase/client';
+import { Calendar, ArrowLeft, User } from 'lucide-react';
 import { CustomButton } from '@/components/ui/CustomButton';
+import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Mic, 
-  Keyboard, 
-  ArrowRight, 
-  FileText, 
-  Brain 
-} from 'lucide-react';
-import { Json } from '@/integrations/supabase/types';
-import { SegmentedControl } from '@/components/SegmentedControl';
-import { SOAPNote } from '@/components/note-templates/SOAPNote';
-import { HPNote } from '@/components/note-templates/HPNote';
-import { ProgressNote } from '@/components/note-templates/ProgressNote';
-import { 
+import { Input } from '@/components/ui/input';
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import PatientSearch from '@/components/PatientSearch';
+import SOAPNote from '@/components/note-templates/SOAPNote';
+import HPNote from '@/components/note-templates/HPNote';
+import ProgressNote from '@/components/note-templates/ProgressNote';
 
 const NewConsultation = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState<'select-type' | 'create'>('select-type');
+  // Get any state passed from patient view
+  const location = useLocation();
+  const initialPatientId = location.state?.patientId || '';
+  const initialPatientFirstName = location.state?.patientFirstName || '';
+  const initialPatientLastName = location.state?.patientLastName || '';
+  
   const navigate = useNavigate();
   const { toast } = useToast();
   
   // Form state
-  const [patientFirstName, setPatientFirstName] = useState('');
-  const [patientLastName, setPatientLastName] = useState('');
-  const [noteType, setNoteType] = useState('SOAP');
-  const [inputMethod, setInputMethod] = useState<'text' | 'voice'>('text');
-  const [noteContent, setNoteContent] = useState('');
-  const [isGeneratingWithAI, setIsGeneratingWithAI] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
-  const [quickPrompt, setQuickPrompt] = useState('');
-  const [isUsingAI, setIsUsingAI] = useState(false);
-  const [status, setStatus] = useState('scheduled');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(initialPatientId);
+  const [patientName, setPatientName] = useState<string>(
+    initialPatientFirstName && initialPatientLastName 
+      ? `${initialPatientFirstName} ${initialPatientLastName}`
+      : ''
+  );
+  const [date, setDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [time, setTime] = useState<string>(format(new Date(), 'HH:mm'));
+  const [noteType, setNoteType] = useState<string>('SOAP');
+  const [status, setStatus] = useState<string>('scheduled');
+  const [chiefComplaint, setChiefComplaint] = useState<string>('');
+  const [medicalHistory, setMedicalHistory] = useState<string>('');
+  const [noteContent, setNoteContent] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isGeneratingWithAI, setIsGeneratingWithAI] = useState<boolean>(false);
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  // Reset note content when note type changes
+  useEffect(() => {
+    setNoteContent('');
+  }, [noteType]);
+  
+  const handlePatientSelect = (patient: any) => {
+    setSelectedPatientId(patient.id);
+    setPatientName(`${patient.first_name} ${patient.last_name}`);
+  };
+  
+  const handleCreateConsultation = async () => {
+    if (!selectedPatientId) {
+      toast({
+        title: "Error",
+        description: "Please select a patient",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!date) {
+      toast({
+        title: "Error",
+        description: "Please select a date",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
+      setIsLoading(true);
+      
+      // Get the current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         toast({
-          title: "Authentication Error",
+          title: "Error",
           description: "You must be logged in to create a consultation",
           variant: "destructive"
         });
-        navigate('/login');
         return;
       }
       
-      // First create or retrieve patient
-      const { data: existingPatients, error: searchError } = await supabase
-        .from('patients')
-        .select()
-        .eq('user_id', user.id)
-        .eq('first_name', patientFirstName)
-        .eq('last_name', patientLastName);
+      // Create date-time string from date and time inputs
+      const dateTime = time ? `${date}T${time}:00` : `${date}T00:00:00`;
       
-      if (searchError) {
-        throw searchError;
-      }
-      
-      let patientId;
-      
-      if (existingPatients && existingPatients.length > 0) {
-        // Use existing patient
-        patientId = existingPatients[0].id;
-      } else {
-        // Create new patient
-        const { data: newPatient, error: insertError } = await supabase
-          .from('patients')
-          .insert({
-            user_id: user.id,
-            first_name: patientFirstName,
-            last_name: patientLastName
-          })
-          .select()
-          .single();
-        
-        if (insertError) {
-          throw insertError;
-        }
-        
-        patientId = newPatient.id;
-      }
-      
-      // Create content object based on note type
-      let contentObj: any = {};
-      
-      if (noteType === 'SOAP') {
-        try {
-          contentObj = JSON.parse(noteContent);
-        } catch (e) {
-          contentObj = {
-            subjective: noteContent,
-            objective: '',
-            assessment: '',
-            plan: ''
-          };
-        }
-      } else if (noteType === 'H&P') {
-        try {
-          contentObj = JSON.parse(noteContent);
-        } catch (e) {
-          contentObj = {
-            history: noteContent,
-            physical_exam: '',
-            assessment: '',
-            plan: ''
-          };
-        }
-      } else {
-        try {
-          contentObj = JSON.parse(noteContent);
-        } catch (e) {
-          contentObj = {
-            progress_note: noteContent
-          };
-        }
-      }
-      
-      // Create new consultation
-      const { data: consultation, error: consultationError } = await supabase
+      // Create consultation
+      const { data, error } = await supabase
         .from('consultations')
         .insert({
           user_id: user.id,
-          patient_id: patientId,
+          patient_id: selectedPatientId,
+          date: dateTime,
           note_type: noteType,
           status: status,
-          content: contentObj as Json,
-          date: new Date().toISOString()
+          content: {
+            chief_complaint: chiefComplaint,
+            medical_history: medicalHistory,
+            note: noteContent
+          }
         })
         .select()
         .single();
       
-      if (consultationError) {
-        throw consultationError;
+      if (error) {
+        throw error;
       }
       
       toast({
-        title: "Success!",
-        description: "New consultation created",
+        title: "Success",
+        description: "Consultation created successfully!",
       });
       
-      // Navigate to consultation detail/edit page
-      navigate(`/consultations/${consultation.id}`);
+      // Navigate to the consultation detail page
+      navigate(`/consultations/${data.id}`);
       
     } catch (error) {
       console.error('Error creating consultation:', error);
       toast({
         title: "Error",
-        description: "Failed to create new consultation",
+        description: "Failed to create consultation. Please try again.",
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
+  
+  const handleBack = () => {
+    navigate(-1);
+  };
 
   const handleWriteWithAI = async () => {
-    if (!quickPrompt.trim()) {
+    if (!chiefComplaint && !medicalHistory) {
       toast({
         title: "Error",
-        description: "Please enter some content for AI to generate from",
+        description: "Please provide at least some information about the patient's symptoms or medical history.",
         variant: "destructive"
       });
       return;
     }
 
-    setIsGeneratingWithAI(true);
-    
     try {
-      // Call the Gemini API via Supabase edge function
-      const { data, error } = await supabase.functions.invoke('generate-with-gemini', {
-        body: { 
-          prompt: quickPrompt,
-          noteType: noteType 
+      setIsGeneratingWithAI(true);
+
+      // Call the write-with-gemini function
+      const { data, error } = await supabase.functions.invoke('write-with-gemini', {
+        body: {
+          noteType: noteType,
+          patientInfo: patientName,
+          symptoms: chiefComplaint,
+          medicalHistory: medicalHistory
         }
       });
-      
-      if (error) throw new Error(error.message);
-      
-      if (data?.generatedContent) {
-        setNoteContent(data.generatedContent);
-        setIsUsingAI(false);
-        
-        toast({
-          title: "Success!",
-          description: "Content generated with AI",
-        });
-      } else {
-        throw new Error("No content returned from AI service");
+
+      if (error) {
+        throw new Error(error.message);
       }
-    } catch (error) {
-      console.error("AI generation error:", error);
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Set the generated content
+      setNoteContent(data.note);
+
       toast({
-        title: "AI Generation Failed",
-        description: error instanceof Error ? error.message : "Could not generate content with AI",
+        title: "Success",
+        description: "Note generated successfully!"
+      });
+
+    } catch (error) {
+      console.error('Error generating note with AI:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate note: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
@@ -224,394 +201,45 @@ const NewConsultation = () => {
     }
   };
   
-  // Voice recording functionality
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setAudioStream(stream);
-      
-      const recorder = new MediaRecorder(stream);
-      setMediaRecorder(recorder);
-      
-      const chunks: Blob[] = [];
-      setAudioChunks(chunks);
-      
-      recorder.ondataavailable = (e) => {
-        chunks.push(e.data);
-      };
-      
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-        
-        // Convert to base64 to send to backend
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64Audio = reader.result?.toString().split(',')[1];
-          
-          if (base64Audio) {
-            toast({
-              title: "Processing",
-              description: "Transcribing your recording...",
-            });
-            
-            try {
-              const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-                body: { audio: base64Audio }
-              });
-              
-              if (error) throw new Error(error.message);
-              
-              if (data?.text) {
-                setNoteContent(data.text);
-              } else {
-                throw new Error("No transcription returned");
-              }
-            } catch (error) {
-              console.error("Transcription error:", error);
-              toast({
-                title: "Transcription Failed",
-                description: error instanceof Error ? error.message : "Could not transcribe audio",
-                variant: "destructive"
-              });
-            }
-          }
-        };
-      };
-      
-      recorder.start();
-      setIsRecording(true);
-      
-      toast({
-        title: "Recording Started",
-        description: "Speak clearly into your microphone",
-      });
-      
-    } catch (error) {
-      console.error("Error accessing microphone:", error);
-      toast({
-        title: "Error",
-        description: "Could not access microphone",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  const stopRecording = () => {
-    if (mediaRecorder && isRecording) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-      
-      // Stop all audio tracks
-      if (audioStream) {
-        audioStream.getAudioTracks().forEach(track => track.stop());
-      }
-      
-      toast({
-        title: "Recording Stopped",
-        description: "Processing your audio...",
-      });
-    }
-  };
-  
-  const renderNoteEditor = () => {
-    if (isUsingAI) {
-      return (
-        <Card className="shadow-md border-blue-100 dark:border-blue-900/50">
-          <CardHeader>
-            <CardTitle className="text-blue-700 dark:text-blue-400">Write with AI</CardTitle>
-            <CardDescription>
-              Provide a brief description of the patient's condition and we'll generate a complete {noteType === 'SOAP' ? 'SOAP note' : noteType === 'H&P' ? 'History & Physical' : 'Progress Note'} for you.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Example: 45-year-old male presenting with fever and cough for 3 days. Patient reports fatigue and mild shortness of breath."
-              value={quickPrompt}
-              onChange={(e) => setQuickPrompt(e.target.value)}
-              className="min-h-[150px] border-blue-200 focus:border-blue-400"
-            />
-            
-            <div className="flex justify-end space-x-2">
-              <CustomButton
-                type="button"
-                variant="outline"
-                onClick={() => setIsUsingAI(false)}
-                className="border-blue-300 text-blue-700 hover:bg-blue-50"
-              >
-                Cancel
-              </CustomButton>
-              
-              <CustomButton
-                type="button"
-                variant="primary"
-                disabled={isGeneratingWithAI || !quickPrompt.trim()}
-                onClick={handleWriteWithAI}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
-              >
-                {isGeneratingWithAI ? (
-                  <>
-                    <div className="animate-pulse">Generating...</div>
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 backdrop-blur-sm rounded-md">
-                      <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <Brain className="h-4 w-4" />
-                    Generate Complete Note
-                  </>
-                )}
-              </CustomButton>
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
-    
-    if (inputMethod === 'voice') {
-      return (
-        <Card className="shadow-md border-blue-100 dark:border-blue-900/50">
-          <CardHeader>
-            <CardTitle className="text-blue-700 dark:text-blue-400">Record Your Note</CardTitle>
-            <CardDescription>
-              Click the microphone button and start speaking
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <button
-                type="button"
-                className={`p-6 rounded-full transition-colors ${isRecording 
-                  ? 'bg-red-100 hover:bg-red-200 text-red-600 animate-pulse' 
-                  : 'bg-blue-100 hover:bg-blue-200 text-blue-600'}`}
-                onClick={isRecording ? stopRecording : startRecording}
-              >
-                <Mic className="h-8 w-8" />
-              </button>
-              <p className="text-neutral-500">
-                {isRecording 
-                  ? 'Recording... Click to stop' 
-                  : 'Click to start recording'}
-              </p>
-              
-              {noteContent && (
-                <div className="w-full mt-4 p-4 border rounded-md bg-neutral-50 dark:bg-neutral-800/50 border-blue-100 dark:border-blue-900/50">
-                  <p className="text-sm font-medium mb-2">Transcription:</p>
-                  <p>{noteContent}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Text input mode with different note templates
+  const renderNoteTemplate = () => {
     switch (noteType) {
       case 'SOAP':
         return (
           <SOAPNote 
-            noteContent={noteContent}
+            noteContent={noteContent} 
             setNoteContent={setNoteContent}
-            onWriteWithAI={() => setIsUsingAI(true)}
+            onWriteWithAI={handleWriteWithAI}
             isGeneratingWithAI={isGeneratingWithAI}
           />
         );
       case 'H&P':
         return (
           <HPNote 
-            noteContent={noteContent}
+            noteContent={noteContent} 
             setNoteContent={setNoteContent}
-            onWriteWithAI={() => setIsUsingAI(true)}
+            onWriteWithAI={handleWriteWithAI}
+            isGeneratingWithAI={isGeneratingWithAI}
+          />
+        );
+      case 'Progress':
+        return (
+          <ProgressNote 
+            noteContent={noteContent} 
+            setNoteContent={setNoteContent}
+            onWriteWithAI={handleWriteWithAI}
             isGeneratingWithAI={isGeneratingWithAI}
           />
         );
       default:
         return (
-          <ProgressNote 
-            noteContent={noteContent}
-            setNoteContent={setNoteContent}
-            onWriteWithAI={() => setIsUsingAI(true)}
-            isGeneratingWithAI={isGeneratingWithAI}
-          />
-        );
-    }
-  };
-  
-  const renderStep = () => {
-    switch (step) {
-      case 'select-type':
-        return (
-          <div className="max-w-md mx-auto">
-            <h1 className="text-3xl font-bold mb-8 text-center text-blue-800 dark:text-blue-300">New Consultation</h1>
-            
-            <Card className="shadow-md border-blue-100 dark:border-blue-900/50">
-              <CardHeader>
-                <CardTitle className="text-blue-700 dark:text-blue-400">Select Note Type</CardTitle>
-                <CardDescription>
-                  Choose the type of note you want to create
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <RadioGroup 
-                  defaultValue="SOAP" 
-                  value={noteType}
-                  onValueChange={setNoteType}
-                  className="space-y-3"
-                >
-                  <div className="flex items-center space-x-2 border rounded-md p-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-blue-200 dark:border-blue-800/50">
-                    <RadioGroupItem value="SOAP" id="SOAP" className="text-blue-600" />
-                    <Label htmlFor="SOAP" className="cursor-pointer font-medium">SOAP Note</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border rounded-md p-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-blue-200 dark:border-blue-800/50">
-                    <RadioGroupItem value="H&P" id="HP" className="text-blue-600" />
-                    <Label htmlFor="HP" className="cursor-pointer font-medium">History & Physical</Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border rounded-md p-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-blue-200 dark:border-blue-800/50">
-                    <RadioGroupItem value="Progress" id="Progress" className="text-blue-600" />
-                    <Label htmlFor="Progress" className="cursor-pointer font-medium">Progress Note</Label>
-                  </div>
-                </RadioGroup>
-                
-                <div className="flex justify-end">
-                  <CustomButton 
-                    type="button" 
-                    variant="primary"
-                    size="md"
-                    className="mt-4 bg-blue-600 hover:bg-blue-700"
-                    onClick={() => setStep('create')}
-                  >
-                    Continue <ArrowRight className="ml-2 h-4 w-4" />
-                  </CustomButton>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="p-4 border rounded-md">
+            <textarea
+              className="w-full h-64 p-2 border rounded-md"
+              value={noteContent}
+              onChange={(e) => setNoteContent(e.target.value)}
+              placeholder="Enter consultation notes here..."
+            />
           </div>
-        );
-        
-      case 'create':
-        return (
-          <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold mb-6 text-center text-blue-800 dark:text-blue-300">
-              {noteType === 'SOAP' ? 'SOAP Note' : 
-               noteType === 'H&P' ? 'History & Physical' : 'Progress Note'}
-            </h1>
-            
-            <Card className="shadow-md border-blue-100 dark:border-blue-900/50">
-              <CardHeader>
-                <CardTitle className="text-blue-700 dark:text-blue-400">Patient Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="firstName">First Name</Label>
-                    <input
-                      id="firstName"
-                      type="text"
-                      value={patientFirstName}
-                      onChange={(e) => setPatientFirstName(e.target.value)}
-                      required
-                      className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-700 border-blue-200"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <input
-                      id="lastName"
-                      type="text"
-                      value={patientLastName}
-                      onChange={(e) => setPatientLastName(e.target.value)}
-                      required
-                      className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-700 border-blue-200"
-                    />
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <Label htmlFor="status">Consultation Status</Label>
-                  <Select
-                    value={status}
-                    onValueChange={setStatus}
-                  >
-                    <SelectTrigger className="w-full border-blue-200 focus:ring-blue-500">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="shadow-md border-blue-100 dark:border-blue-900/50">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-blue-700 dark:text-blue-400">Create Note</CardTitle>
-                  <CardDescription>
-                    Choose your input method and create your note
-                  </CardDescription>
-                </div>
-                
-                <div className="flex flex-col gap-4 sm:flex-row">
-                  {/* Segmented control for input method */}
-                  <SegmentedControl
-                    value={inputMethod}
-                    onValueChange={(value) => setInputMethod(value as 'text' | 'voice')}
-                    options={[
-                      { value: 'text', label: 'Type', icon: <Keyboard className="h-4 w-4" /> },
-                      { value: 'voice', label: 'Voice', icon: <Mic className="h-4 w-4" /> }
-                    ]}
-                    className="min-w-52"
-                  />
-                  
-                  {/* Write with AI Button - only show in text mode */}
-                  {inputMethod === 'text' && !isUsingAI && (
-                    <CustomButton
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsUsingAI(true)}
-                      size="sm"
-                      className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
-                    >
-                      <Brain className="h-4 w-4" />
-                      Write with AI
-                    </CustomButton>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {renderNoteEditor()}
-              </CardContent>
-            </Card>
-            
-            <div className="flex justify-between">
-              <CustomButton
-                type="button"
-                variant="outline"
-                size="md"
-                onClick={() => setStep('select-type')}
-                className="border-blue-300 text-blue-700 hover:bg-blue-50"
-              >
-                Back
-              </CustomButton>
-              
-              <CustomButton
-                type="submit" 
-                variant="primary"
-                size="md"
-                disabled={isLoading || !noteContent.trim()}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {isLoading ? "Creating..." : "Create Consultation"}
-              </CustomButton>
-            </div>
-          </form>
         );
     }
   };
@@ -620,11 +248,196 @@ const NewConsultation = () => {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
-        <SidebarOpener />
         
-        <SidebarInset className="bg-gradient-to-br from-blue-50 to-sky-100 dark:from-gray-900 dark:to-blue-950">
-          <div className="container px-4 py-12">
-            {renderStep()}
+        <SidebarInset className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-900 dark:to-blue-950">
+          <div className="container px-4 py-8">
+            <div className="flex items-center gap-2 mb-8">
+              <CustomButton
+                variant="outline"
+                size="sm"
+                onClick={handleBack}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft size={16} />
+                Back
+              </CustomButton>
+              
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+                New Consultation
+              </h1>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Left Column - Patient & Consultation Details */}
+              <div className="md:col-span-1 space-y-6">
+                <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5 text-blue-500" />
+                      Patient Information
+                    </CardTitle>
+                    <CardDescription>
+                      Select or search for a patient
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!selectedPatientId ? (
+                      <div className="space-y-4">
+                        <PatientSearch onSelect={handlePatientSelect} />
+                        
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                          Search for a patient by name or add a new patient first.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-medium">{patientName}</h3>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">Selected Patient</p>
+                          </div>
+                          <CustomButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPatientId('');
+                              setPatientName('');
+                            }}
+                          >
+                            Change
+                          </CustomButton>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-blue-500" />
+                      Consultation Details
+                    </CardTitle>
+                    <CardDescription>
+                      Enter consultation date and type
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="date">Date</Label>
+                      <Input
+                        id="date"
+                        type="date" 
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="border-blue-200 focus:border-blue-400"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="time">Time</Label>
+                      <Input
+                        id="time"
+                        type="time"
+                        value={time}
+                        onChange={(e) => setTime(e.target.value)}
+                        className="border-blue-200 focus:border-blue-400"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="noteType">Note Type</Label>
+                      <Select value={noteType} onValueChange={setNoteType}>
+                        <SelectTrigger id="noteType" className="border-blue-200 focus:border-blue-400">
+                          <SelectValue placeholder="Select note type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SOAP">SOAP Note</SelectItem>
+                          <SelectItem value="H&P">History & Physical</SelectItem>
+                          <SelectItem value="Progress">Progress Note</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select value={status} onValueChange={setStatus}>
+                        <SelectTrigger id="status" className="border-blue-200 focus:border-blue-400">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="scheduled">Scheduled</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
+                  <CardHeader>
+                    <CardTitle>Patient Information</CardTitle>
+                    <CardDescription>
+                      Enter patient details for this visit
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="chiefComplaint">Chief Complaint / Symptoms</Label>
+                      <Textarea
+                        id="chiefComplaint"
+                        value={chiefComplaint}
+                        onChange={(e) => setChiefComplaint(e.target.value)}
+                        placeholder="Describe the patient's main symptoms and concerns..."
+                        className="min-h-[100px] border-blue-200 focus:border-blue-400"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="medicalHistory">Medical History</Label>
+                      <Textarea
+                        id="medicalHistory"
+                        value={medicalHistory}
+                        onChange={(e) => setMedicalHistory(e.target.value)}
+                        placeholder="Enter relevant medical history..."
+                        className="min-h-[100px] border-blue-200 focus:border-blue-400"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Right Column - Note Editor */}
+              <Card className="md:col-span-2 shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
+                <CardHeader>
+                  <CardTitle>
+                    {noteType === 'SOAP' ? 'SOAP Note' : 
+                     noteType === 'H&P' ? 'History & Physical' : 
+                     noteType === 'Progress' ? 'Progress Note' : 'Consultation Note'}
+                  </CardTitle>
+                  <CardDescription>
+                    Create a detailed medical note for this consultation
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {renderNoteTemplate()}
+                  
+                  <div className="mt-6 flex justify-end">
+                    <CustomButton
+                      variant="primary"
+                      size="lg"
+                      onClick={handleCreateConsultation}
+                      disabled={isLoading || !selectedPatientId}
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                    >
+                      {isLoading ? 'Creating...' : 'Create Consultation'}
+                    </CustomButton>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </SidebarInset>
       </div>

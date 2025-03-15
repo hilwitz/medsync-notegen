@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Sidebar, 
   SidebarContent, 
@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const DashboardSidebar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -51,6 +52,11 @@ const DashboardSidebar = () => {
     }
   };
 
+  // Check if the current path matches the given path
+  const isActive = (path: string) => {
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -63,7 +69,7 @@ const DashboardSidebar = () => {
           <SidebarGroupLabel>Main</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={window.location.pathname === '/dashboard'}>
+              <SidebarMenuButton asChild isActive={isActive('/dashboard')}>
                 <Link to="/dashboard">
                   <Home className="w-5 h-5" />
                   <span>Dashboard</span>
@@ -71,7 +77,7 @@ const DashboardSidebar = () => {
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild isActive={isActive('/patients')}>
                 <Link to="/patients">
                   <Users className="w-5 h-5" />
                   <span>Patients</span>
@@ -79,7 +85,7 @@ const DashboardSidebar = () => {
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild isActive={isActive('/consultations/new')}>
                 <Link to="/consultations/new">
                   <FilePlus className="w-5 h-5" />
                   <span>New Consultation</span>
@@ -87,10 +93,10 @@ const DashboardSidebar = () => {
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild isActive={isActive('/notes')}>
                 <Link to="/notes">
-                  <FileText className="w-5 h-5" />
-                  <span>Notes</span>
+                  <FileText className="w-5 h-5 text-blue-500" />
+                  <span className="text-blue-500">Notes</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -100,7 +106,7 @@ const DashboardSidebar = () => {
           <SidebarGroupLabel>Account</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild isActive={isActive('/profile')}>
                 <Link to="/profile">
                   <User className="w-5 h-5" />
                   <span>Profile</span>
@@ -108,7 +114,7 @@ const DashboardSidebar = () => {
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild isActive={isActive('/settings')}>
                 <Link to="/settings">
                   <Settings className="w-5 h-5" />
                   <span>Settings</span>

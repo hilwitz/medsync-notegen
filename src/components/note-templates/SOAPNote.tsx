@@ -1,150 +1,161 @@
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { CustomButton } from "@/components/ui/CustomButton";
-import { Brain, Sparkles, FileText, PenLine } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CustomButton } from '@/components/ui/CustomButton';
+import { Wand2 } from 'lucide-react';
 
-interface SOAPNoteProps {
+export interface SOAPNoteProps {
   noteContent: string;
   setNoteContent: (content: string) => void;
   onWriteWithAI?: () => void;
   isGeneratingWithAI?: boolean;
 }
 
-export const SOAPNote = ({ 
-  noteContent = '', 
-  setNoteContent,
-  onWriteWithAI,
-  isGeneratingWithAI = false
-}: SOAPNoteProps) => {
-  const [activeTab, setActiveTab] = useState('subjective');
-  
-  // Parse the note content as JSON or create default structure
-  const parsedContent = (() => {
-    try {
-      return JSON.parse(noteContent);
-    } catch (e) {
-      return {
-        subjective: '',
-        objective: '',
-        assessment: '',
-        plan: ''
-      };
-    }
-  })();
-  
-  const handleContentChange = (section: string, value: string) => {
-    const updatedContent = {
-      ...parsedContent,
-      [section]: value
+const SOAPNote = ({ noteContent, setNoteContent, onWriteWithAI, isGeneratingWithAI }: SOAPNoteProps) => {
+  // Function to update the note without affecting other sections
+  const updateSection = (section: string, newContent: string) => {
+    const sections = {
+      subjective: getSection('subjective'),
+      objective: getSection('objective'),
+      assessment: getSection('assessment'),
+      plan: getSection('plan')
     };
     
-    setNoteContent(JSON.stringify(updatedContent));
+    sections[section as keyof typeof sections] = newContent;
+    
+    const newNote = `
+# SOAP Note
+
+## Subjective
+${sections.subjective}
+
+## Objective
+${sections.objective}
+
+## Assessment
+${sections.assessment}
+
+## Plan
+${sections.plan}
+`.trim();
+    
+    setNoteContent(newNote);
   };
+  
+  // Function to extract a specific section from the note
+  const getSection = (section: string): string => {
+    const regex = new RegExp(`## ${section.charAt(0).toUpperCase() + section.slice(1)}\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
+    const match = noteContent.match(regex);
+    return match ? match[1].trim() : '';
+  };
+  
+  // Initialize with a template if empty
+  if (!noteContent) {
+    const template = `
+# SOAP Note
+
+## Subjective
+Patient reports:
+
+## Objective
+Vitals:
+Examination:
+
+## Assessment
+Diagnosis:
+
+## Plan
+Treatment:
+Medications:
+Follow-up:
+    `.trim();
+    setNoteContent(template);
+  }
   
   return (
     <div className="space-y-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      {onWriteWithAI && (
+        <div className="flex justify-end mb-2">
+          <CustomButton
+            variant="secondary"
+            size="sm"
+            onClick={onWriteWithAI}
+            disabled={isGeneratingWithAI}
+            className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+          >
+            {isGeneratingWithAI ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <Wand2 className="h-4 w-4" />
+                <span>Write with AI</span>
+              </>
+            )}
+          </CustomButton>
+        </div>
+      )}
+      
+      <Tabs defaultValue="subjective" className="w-full">
         <TabsList className="grid grid-cols-4 mb-4">
-          <TabsTrigger value="subjective" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/50 dark:data-[state=active]:text-blue-300">
-            Subjective
-          </TabsTrigger>
-          <TabsTrigger value="objective" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/50 dark:data-[state=active]:text-blue-300">
-            Objective
-          </TabsTrigger>
-          <TabsTrigger value="assessment" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/50 dark:data-[state=active]:text-blue-300">
-            Assessment
-          </TabsTrigger>
-          <TabsTrigger value="plan" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900/50 dark:data-[state=active]:text-blue-300">
-            Plan
-          </TabsTrigger>
+          <TabsTrigger value="subjective">Subjective</TabsTrigger>
+          <TabsTrigger value="objective">Objective</TabsTrigger>
+          <TabsTrigger value="assessment">Assessment</TabsTrigger>
+          <TabsTrigger value="plan">Plan</TabsTrigger>
         </TabsList>
         
-        <Card className="shadow-md border-blue-100 dark:border-blue-900/50">
-          <TabsContent value="subjective" className="m-0">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-600" />
-                Subjective
-              </CardTitle>
-              <CardDescription>
-                Patient's chief complaint and history of present illness
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Enter subjective information such as chief complaint, history of present illness, review of systems..."
-                className="min-h-[300px] border-blue-200 focus:border-blue-400"
-                value={parsedContent.subjective}
-                onChange={(e) => handleContentChange('subjective', e.target.value)}
-              />
-            </CardContent>
-          </TabsContent>
-          
-          <TabsContent value="objective" className="m-0">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <PenLine className="h-5 w-5 text-blue-600" />
-                Objective
-              </CardTitle>
-              <CardDescription>
-                Physical examination findings and test results
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Enter objective information such as vital signs, physical examination findings, lab results..."
-                className="min-h-[300px] border-blue-200 focus:border-blue-400"
-                value={parsedContent.objective}
-                onChange={(e) => handleContentChange('objective', e.target.value)}
-              />
-            </CardContent>
-          </TabsContent>
-          
-          <TabsContent value="assessment" className="m-0">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-blue-600" />
-                Assessment
-              </CardTitle>
-              <CardDescription>
-                Diagnoses and clinical impressions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Enter assessment information such as diagnoses, differential diagnoses, clinical impressions..."
-                className="min-h-[300px] border-blue-200 focus:border-blue-400"
-                value={parsedContent.assessment}
-                onChange={(e) => handleContentChange('assessment', e.target.value)}
-              />
-            </CardContent>
-          </TabsContent>
-          
-          <TabsContent value="plan" className="m-0">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-600" />
-                Plan
-              </CardTitle>
-              <CardDescription>
-                Treatment plan and follow-up instructions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Enter plan information such as medications, treatments, follow-up instructions..."
-                className="min-h-[300px] border-blue-200 focus:border-blue-400"
-                value={parsedContent.plan}
-                onChange={(e) => handleContentChange('plan', e.target.value)}
-              />
-            </CardContent>
-          </TabsContent>
-        </Card>
+        <TabsContent value="subjective">
+          <Textarea
+            value={getSection('subjective')}
+            onChange={(e) => updateSection('subjective', e.target.value)}
+            placeholder="Document patient's history, complaints, and symptoms..."
+            className="min-h-[300px] p-4 font-mono"
+          />
+        </TabsContent>
+        
+        <TabsContent value="objective">
+          <Textarea
+            value={getSection('objective')}
+            onChange={(e) => updateSection('objective', e.target.value)}
+            placeholder="Document physical examination findings, vital signs, and test results..."
+            className="min-h-[300px] p-4 font-mono"
+          />
+        </TabsContent>
+        
+        <TabsContent value="assessment">
+          <Textarea
+            value={getSection('assessment')}
+            onChange={(e) => updateSection('assessment', e.target.value)}
+            placeholder="Document diagnoses, interpretations, and clinical impressions..."
+            className="min-h-[300px] p-4 font-mono"
+          />
+        </TabsContent>
+        
+        <TabsContent value="plan">
+          <Textarea
+            value={getSection('plan')}
+            onChange={(e) => updateSection('plan', e.target.value)}
+            placeholder="Document treatment plans, medications, and follow-up instructions..."
+            className="min-h-[300px] p-4 font-mono"
+          />
+        </TabsContent>
       </Tabs>
+      
+      <div className="mt-4">
+        <details>
+          <summary className="cursor-pointer text-sm text-neutral-500 dark:text-neutral-400">
+            Preview Full Note
+          </summary>
+          <div className="mt-2 p-4 bg-neutral-50 dark:bg-neutral-900 rounded-md border border-neutral-200 dark:border-neutral-800 whitespace-pre-wrap font-mono text-sm">
+            {noteContent}
+          </div>
+        </details>
+      </div>
     </div>
   );
 };
+
+export default SOAPNote;

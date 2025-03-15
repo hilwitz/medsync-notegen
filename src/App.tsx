@@ -2,6 +2,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -70,72 +71,74 @@ const App = () => {
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<HomeRoute />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/features" element={<Features />} />
-            <Route path="/free-trial" element={<Navigate to="/auth" />} />
-            
-            {/* Protected Routes */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/consultations/new" element={
-              <ProtectedRoute>
-                <NewConsultation />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/consultations/:id" element={
-              <ProtectedRoute>
-                <ConsultationDetail />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/patients" element={
-              <ProtectedRoute>
-                <Patients />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/patients/:id" element={
-              <ProtectedRoute>
-                <Patients />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <Settings />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/notes" element={
-              <ProtectedRoute>
-                <Notes />
-              </ProtectedRoute>
-            } />
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<HomeRoute />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/features" element={<Features />} />
+              <Route path="/free-trial" element={<Navigate to="/auth" />} />
+              
+              {/* Protected Routes */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/consultations/new" element={
+                <ProtectedRoute>
+                  <NewConsultation />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/consultations/:id" element={
+                <ProtectedRoute>
+                  <ConsultationDetail />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/patients" element={
+                <ProtectedRoute>
+                  <Patients />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/patients/:id" element={
+                <ProtectedRoute>
+                  <Patients />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/notes" element={
+                <ProtectedRoute>
+                  <Notes />
+                </ProtectedRoute>
+              } />
+              
+              {/* Catch-all route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

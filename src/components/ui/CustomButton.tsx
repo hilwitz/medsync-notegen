@@ -76,7 +76,7 @@ const CustomButton = React.forwardRef<HTMLButtonElement, CustomButtonProps>(
             <span>Loading...</span>
           </div>
         ) : (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             {icon && iconPosition === 'left' && <span>{icon}</span>}
             {children}
             {icon && iconPosition === 'right' && <span>{icon}</span>}

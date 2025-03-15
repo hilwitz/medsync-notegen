@@ -30,9 +30,9 @@ export const SidebarOpener = () => {
         onClick={toggleSidebar}
         size="sm"
         variant="outline"
-        className="rounded-full p-2 h-10 w-10 shadow-md"
+        className="rounded-full p-2 h-10 w-10 shadow-md backdrop-blur-md bg-white/80 dark:bg-gray-800/80 border-blue-200 dark:border-blue-800"
       >
-        <PanelLeft size={20} />
+        <PanelLeft size={20} className="text-blue-600 dark:text-blue-400" />
         <span className="sr-only">Open Sidebar</span>
       </CustomButton>
     </div>

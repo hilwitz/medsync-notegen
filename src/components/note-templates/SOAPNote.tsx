@@ -10,14 +10,14 @@ import { Brain, Sparkles, FileText, PenLine } from 'lucide-react';
 interface SOAPNoteProps {
   noteContent: string;
   setNoteContent: (content: string) => void;
-  enhanceWithAI?: (content: string) => void;
+  onWriteWithAI?: () => void;
   isGeneratingWithAI?: boolean;
 }
 
 export const SOAPNote = ({ 
   noteContent = '', 
   setNoteContent,
-  enhanceWithAI,
+  onWriteWithAI,
   isGeneratingWithAI = false
 }: SOAPNoteProps) => {
   const [activeTab, setActiveTab] = useState('subjective');

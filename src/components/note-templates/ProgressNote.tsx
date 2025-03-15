@@ -54,6 +54,22 @@ export const ProgressNote = ({
           value={parsedContent.progress_note}
           onChange={(e) => handleContentChange(e.target.value)}
         />
+        
+        {onWriteWithAI && (
+          <div className="mt-4 flex justify-end">
+            <CustomButton
+              type="button"
+              variant="outline"
+              onClick={onWriteWithAI}
+              size="sm"
+              className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+              disabled={isGeneratingWithAI}
+            >
+              <Brain className="h-4 w-4" />
+              Write with AI
+            </CustomButton>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

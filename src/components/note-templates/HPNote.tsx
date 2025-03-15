@@ -9,14 +9,14 @@ import { Brain, Sparkles, FileText, PenLine, ActivityIcon } from 'lucide-react';
 interface HPNoteProps {
   noteContent: string;
   setNoteContent: (content: string) => void;
-  enhanceWithAI?: (content: string) => void;
+  onWriteWithAI?: () => void;
   isGeneratingWithAI?: boolean;
 }
 
 export const HPNote = ({ 
   noteContent = '', 
   setNoteContent,
-  enhanceWithAI,
+  onWriteWithAI,
   isGeneratingWithAI = false
 }: HPNoteProps) => {
   const [activeTab, setActiveTab] = useState('history');

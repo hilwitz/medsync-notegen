@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -78,8 +77,10 @@ interface Consultation {
 const Patients = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [filteredConsultations, setFilteredConsultations] = useState<Consultation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [consultationSearchTerm, setConsultationSearchTerm] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -107,6 +108,29 @@ const Patients = () => {
       fetchPatientDetails(patientIdParam);
     }
   }, [patientIdParam]);
+
+  // Filter consultations based on search term
+  useEffect(() => {
+    if (consultations.length > 0) {
+      if (!consultationSearchTerm.trim()) {
+        setFilteredConsultations(consultations);
+        return;
+      }
+
+      const searchLower = consultationSearchTerm.toLowerCase();
+      const filtered = consultations.filter(consultation => {
+        const date = new Date(consultation.date).toLocaleString().toLowerCase();
+        const type = consultation.note_type.toLowerCase();
+        const status = consultation.status.toLowerCase();
+        
+        return date.includes(searchLower) || 
+               type.includes(searchLower) || 
+               status.includes(searchLower);
+      });
+      
+      setFilteredConsultations(filtered);
+    }
+  }, [consultationSearchTerm, consultations]);
   
   const fetchPatients = async () => {
     try {
@@ -165,6 +189,7 @@ const Patients = () => {
       
       if (consultationsError) throw consultationsError;
       setConsultations(consultationsData || []);
+      setFilteredConsultations(consultationsData || []);
       
     } catch (error) {
       console.error('Error fetching patient details:', error);
@@ -245,49 +270,6 @@ const Patients = () => {
     }
   };
   
-  const openDeleteDialog = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setShowDeleteDialog(true);
-  };
-  
-  const handleDeletePatient = async () => {
-    if (!selectedPatient) return;
-    
-    try {
-      const { error } = await supabase
-        .from('patients')
-        .delete()
-        .eq('id', selectedPatient.id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Success",
-        description: "Patient deleted successfully",
-      });
-      
-      // Update the local state
-      setPatients(patients.filter(p => p.id !== selectedPatient.id));
-      setShowDeleteDialog(false);
-      
-      // If we're viewing the deleted patient, go back to list
-      if (viewMode === 'detail') {
-        setViewMode('list');
-        navigate('/patients');
-      }
-      
-    } catch (error) {
-      console.error('Error deleting patient:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete patient. They may have associated consultations.",
-        variant: "destructive"
-      });
-    }
-  };
-  
   const handleViewPatient = (patientId: string) => {
     navigate(`/patients/${patientId}`);
   };
@@ -303,7 +285,11 @@ const Patients = () => {
   };
   
   const handleViewConsultation = (consultationId: string) => {
-    navigate(`/consultations/${consultationId}`);
+    // Store current patient ID before navigating
+    const currentPatientId = patientIdParam;
+    navigate(`/consultations/${consultationId}`, { 
+      state: { returnToPatient: currentPatientId }
+    });
   };
   
   const handleBackToList = () => {
@@ -457,15 +443,6 @@ const Patients = () => {
                   >
                     <Plus className="h-4 w-4 mr-1" /> New Consultation
                   </CustomButton>
-                  
-                  <CustomButton
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1 border-red-200 hover:bg-red-50 text-red-600"
-                    onClick={() => openDeleteDialog(selectedPatient)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </CustomButton>
                 </div>
               </div>
             </CardContent>
@@ -481,9 +458,18 @@ const Patients = () => {
               <CardDescription>
                 View all consultations for this patient
               </CardDescription>
+              <div className="relative w-full mt-2">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Input
+                  placeholder="Search consultations..."
+                  className="pl-10 border-blue-200 focus:border-blue-400"
+                  value={consultationSearchTerm}
+                  onChange={(e) => setConsultationSearchTerm(e.target.value)}
+                />
+              </div>
             </CardHeader>
             <CardContent>
-              {consultations.length > 0 ? (
+              {filteredConsultations.length > 0 ? (
                 <div className="rounded-md border border-blue-100 dark:border-blue-900 overflow-hidden">
                   <Table>
                     <TableHeader className="bg-blue-50 dark:bg-blue-900/30">
@@ -496,7 +482,7 @@ const Patients = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {consultations.map((consultation) => (
+                      {filteredConsultations.map((consultation) => (
                         <TableRow key={consultation.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10">
                           <TableCell>
                             {formatConsultationDate(consultation.date)}
@@ -531,22 +517,28 @@ const Patients = () => {
               ) : (
                 <div className="py-10 text-center">
                   <Calendar className="h-12 w-12 mx-auto text-blue-400 opacity-50" />
-                  <h3 className="mt-4 text-lg font-medium">No consultations yet</h3>
+                  <h3 className="mt-4 text-lg font-medium">
+                    {consultationSearchTerm ? 'No matching consultations found' : 'No consultations yet'}
+                  </h3>
                   <p className="mt-1 text-gray-500">
-                    This patient doesn't have any consultations
+                    {consultationSearchTerm ? 
+                      'Try a different search term' : 
+                      'This patient doesn\'t have any consultations'}
                   </p>
-                  <CustomButton
-                    variant="primary"
-                    size="md"
-                    className="mt-4 bg-gradient-to-r from-blue-600 to-blue-500"
-                    onClick={() => handleNewConsultation(
-                      selectedPatient.id,
-                      selectedPatient.first_name,
-                      selectedPatient.last_name
-                    )}
-                  >
-                    <Plus className="mr-2 h-4 w-4" /> New Consultation
-                  </CustomButton>
+                  {!consultationSearchTerm && (
+                    <CustomButton
+                      variant="primary"
+                      size="md"
+                      className="mt-4 bg-gradient-to-r from-blue-600 to-blue-500"
+                      onClick={() => handleNewConsultation(
+                        selectedPatient.id,
+                        selectedPatient.first_name,
+                        selectedPatient.last_name
+                      )}
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> New Consultation
+                    </CustomButton>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -764,15 +756,6 @@ const Patients = () => {
                               <Plus className="h-4 w-4 text-blue-600" />
                               <span className="sr-only">New Consultation</span>
                             </CustomButton>
-                            <CustomButton
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-8 p-0 border-red-200 hover:bg-red-50"
-                              onClick={() => openDeleteDialog(patient)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                              <span className="sr-only">Delete</span>
-                            </CustomButton>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -819,31 +802,6 @@ const Patients = () => {
           </div>
         </SidebarInset>
       </div>
-      
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              Confirm Deletion
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete patient "{selectedPatient?.first_name} {selectedPatient?.last_name}"? 
-              This action cannot be undone and will remove all associated data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDeletePatient}
-              className="bg-red-500 hover:bg-red-600"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </SidebarProvider>
   );
 };

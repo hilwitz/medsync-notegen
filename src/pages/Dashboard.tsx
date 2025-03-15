@@ -8,6 +8,13 @@ import { CustomButton } from '@/components/ui/CustomButton';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Consultation {
   id: string;
@@ -137,6 +144,58 @@ const Dashboard = () => {
     fetchConsultations();
   }, [toast]);
 
+  // Handle status change
+  const handleStatusChange = async (consultationId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('consultations')
+        .update({ status: newStatus })
+        .eq('id', consultationId);
+
+      if (error) throw error;
+
+      // Update the local state to reflect the changes
+      const updateConsultationStatus = (consultations: Consultation[]) => {
+        return consultations.map(consult => 
+          consult.id === consultationId 
+            ? {...consult, status: mapStatus(newStatus)} 
+            : consult
+        );
+      };
+
+      setRecentConsultations(updateConsultationStatus(recentConsultations));
+      setAllConsultations(updateConsultationStatus(allConsultations));
+
+      // Update stats
+      const updatedConsultations = allConsultations.map(consult => 
+        consult.id === consultationId 
+          ? {...consult, status: mapStatus(newStatus)} 
+          : consult
+      );
+
+      const pendingCount = updatedConsultations.filter(consult => consult.status === 'in_progress').length;
+      const completedCount = updatedConsultations.filter(consult => consult.status === 'completed').length;
+
+      setStats({
+        ...stats,
+        pendingCount,
+        completedCount
+      });
+
+      toast({
+        title: "Status Updated",
+        description: "Consultation status has been updated"
+      });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update consultation status",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Map Supabase status to our UI status
   const mapStatus = (status: string): 'completed' | 'in_progress' | 'scheduled' => {
     const statusMap: Record<string, 'completed' | 'in_progress' | 'scheduled'> = {
@@ -171,7 +230,7 @@ const Dashboard = () => {
     if (isLoading) {
       return (
         <div className="flex justify-center py-8">
-          <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
+          <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
         </div>
       );
     }
@@ -208,15 +267,27 @@ const Dashboard = () => {
                 {consultation.date}
               </td>
               <td className="py-4">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
                   {consultation.noteType}
                 </span>
               </td>
               <td className="py-4">
-                <div className="flex items-center">
-                  <div className={cn("h-2 w-2 rounded-full mr-2", statusColor[consultation.status])}></div>
-                  <span className="text-sm capitalize">{consultation.status.replace('_', ' ')}</span>
-                </div>
+                <Select
+                  value={consultation.status}
+                  onValueChange={(value) => handleStatusChange(consultation.id, value)}
+                >
+                  <SelectTrigger className="w-[140px] h-8 text-sm">
+                    <div className="flex items-center">
+                      <div className={cn("h-2 w-2 rounded-full mr-2", statusColor[consultation.status as keyof typeof statusColor])}></div>
+                      <span className="capitalize">{consultation.status.replace('_', ' ')}</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scheduled">Scheduled</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
               </td>
               <td className="py-4 text-right pr-4">
                 <div className="flex items-center justify-end space-x-2">
@@ -227,14 +298,6 @@ const Dashboard = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-neutral-600 dark:text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  </button>
-                  <button 
-                    className="p-1 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors duration-150"
-                    onClick={() => handleViewConsultation(consultation.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-neutral-600 dark:text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </button>
                 </div>
@@ -251,11 +314,11 @@ const Dashboard = () => {
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
         
-        <SidebarInset className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-indigo-950">
+        <SidebarInset className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-900 dark:to-blue-950">
           <div className="pt-6 pb-16 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
             <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="text-3xl font-medium bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">Welcome back, {userName || 'Dr.'}</h1>
+                <h1 className="text-3xl font-medium bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">Welcome back, {userName || 'Dr.'}</h1>
                 <p className="text-neutral-600 dark:text-neutral-400 mt-1">Here's an overview of your clinical documentation</p>
               </div>
               
@@ -265,7 +328,7 @@ const Dashboard = () => {
                 <CustomButton 
                   variant="primary" 
                   size="md"
-                  className="shadow-lg shadow-indigo-500/20 hover:shadow-indigo-600/20 transition-all bg-gradient-to-r from-indigo-500 to-purple-600"
+                  className="shadow-lg shadow-blue-500/20 hover:shadow-blue-600/20 transition-all bg-gradient-to-r from-blue-500 to-blue-600"
                   onClick={handleNewConsultation}
                 >
                   New Consultation
@@ -285,19 +348,19 @@ const Dashboard = () => {
                       <p className="text-sm text-neutral-600 dark:text-neutral-400">{stat.title}</p>
                       <p className="text-2xl font-semibold mt-1">{stat.value}</p>
                     </div>
-                    <div className="bg-indigo-100 dark:bg-indigo-900/30 p-3 rounded-lg">
+                    <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-lg">
                       {stat.icon === 'calendar' && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       )}
                       {stat.icon === 'document' && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       )}
                       {stat.icon === 'check' && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                         </svg>
                       )}
@@ -317,8 +380,8 @@ const Dashboard = () => {
                       className={cn(
                         "text-sm font-medium py-4 px-6 transition-colors duration-200",
                         activeTab === tab.id
-                          ? "text-indigo-600 border-b-2 border-indigo-600"
-                          : "text-neutral-600 dark:text-neutral-400 hover:text-indigo-500 hover:border-b-2 hover:border-indigo-500/50"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-neutral-600 dark:text-neutral-400 hover:text-blue-500 hover:border-b-2 hover:border-blue-500/50"
                       )}
                     >
                       {tab.label}

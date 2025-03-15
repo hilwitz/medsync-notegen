@@ -17,14 +17,9 @@ import Notes from "./pages/Notes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Features from "./pages/Features";
+import { SidebarOpener } from "./components/SidebarOpener";
 
 const queryClient = new QueryClient();
-
-const Footer = () => (
-  <div className="text-center p-3 text-sm text-gray-500 border-t bg-white dark:bg-gray-900 dark:border-gray-800 mt-auto">
-    MedSync v1.0.0 - a product by Hilwitz
-  </div>
-);
 
 const App = () => {
   const [session, setSession] = useState<any>(null);
@@ -59,7 +54,6 @@ const App = () => {
     return (
       <div className="flex flex-col min-h-screen">
         {children}
-        <Footer />
       </div>
     );
   };

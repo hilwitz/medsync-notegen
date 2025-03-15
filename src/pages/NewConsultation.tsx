@@ -1,8 +1,9 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import { SidebarOpener } from '@/components/SidebarOpener';
 import { supabase } from '@/integrations/supabase/client';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { useToast } from '@/hooks/use-toast';
@@ -10,12 +11,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Mic, Keyboard, ArrowRight, Sparkles } from 'lucide-react';
+import { Mic, Keyboard, ArrowRight, Sparkles, FileText, PenLine, Brain } from 'lucide-react';
 import { Json } from '@/integrations/supabase/types';
+import { SegmentedControl } from '@/components/SegmentedControl';
+import { SOAPNote } from '@/components/note-templates/SOAPNote';
+import { HPNote } from '@/components/note-templates/HPNote';
+import { ProgressNote } from '@/components/note-templates/ProgressNote';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const NewConsultation = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState<'select-type' | 'input-method' | 'create'>('select-type');
+  const [step, setStep] = useState<'select-type' | 'create'>('select-type');
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -30,6 +36,8 @@ const NewConsultation = () => {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [quickPrompt, setQuickPrompt] = useState('');
+  const [isUsingAI, setIsUsingAI] = useState(false);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,26 +96,37 @@ const NewConsultation = () => {
       let contentObj: any = {};
       
       if (noteType === 'SOAP') {
-        contentObj = {
-          subjective: noteContent,
-          objective: '',
-          assessment: '',
-          plan: ''
-        };
+        try {
+          contentObj = JSON.parse(noteContent);
+        } catch (e) {
+          contentObj = {
+            subjective: noteContent,
+            objective: '',
+            assessment: '',
+            plan: ''
+          };
+        }
       } else if (noteType === 'H&P') {
-        contentObj = {
-          history: noteContent,
-          physical_exam: '',
-          assessment: '',
-          plan: ''
-        };
+        try {
+          contentObj = JSON.parse(noteContent);
+        } catch (e) {
+          contentObj = {
+            history: noteContent,
+            physical_exam: '',
+            assessment: '',
+            plan: ''
+          };
+        }
       } else {
-        contentObj = {
-          progress_note: noteContent
-        };
+        try {
+          contentObj = JSON.parse(noteContent);
+        } catch (e) {
+          contentObj = {
+            progress_note: noteContent
+          };
+        }
       }
       
-      // Valid statuses according to the check constraint: 'scheduled', 'in_progress', 'completed'
       // Create new consultation
       const { data: consultation, error: consultationError } = await supabase
         .from('consultations')
@@ -115,7 +134,7 @@ const NewConsultation = () => {
           user_id: user.id,
           patient_id: patientId,
           note_type: noteType,
-          status: 'scheduled', // Changed from 'in_progress' to 'scheduled' to match the constraint
+          status: 'scheduled',
           content: contentObj as Json,
           date: new Date().toISOString()
         })
@@ -147,7 +166,7 @@ const NewConsultation = () => {
   };
 
   const handleEnhanceWithAI = async () => {
-    if (!noteContent.trim()) {
+    if (!noteContent.trim() && !quickPrompt.trim()) {
       toast({
         title: "Error",
         description: "Please enter some content to enhance",
@@ -159,15 +178,26 @@ const NewConsultation = () => {
     setIsGeneratingWithAI(true);
     
     try {
+      const content = isUsingAI ? quickPrompt : noteContent;
+      
       // Call our backend function instead of requiring user API key
       const { data, error } = await supabase.functions.invoke('enhance-medical-note', {
-        body: { content: noteContent, noteType }
+        body: { content, noteType }
       });
       
       if (error) throw new Error(error.message);
       
       if (data?.enhancedContent) {
-        setNoteContent(data.enhancedContent);
+        if (isUsingAI) {
+          // For AI quick prompt, replace the entire content
+          setNoteContent(data.enhancedContent);
+          // Hide the AI prompt section after generating
+          setIsUsingAI(false);
+        } else {
+          // For regular enhancement, just replace the current noteContent
+          setNoteContent(data.enhancedContent);
+        }
+        
         toast({
           title: "Success!",
           description: "Content enhanced with AI",
@@ -277,6 +307,130 @@ const NewConsultation = () => {
     }
   };
   
+  const renderNoteEditor = () => {
+    if (isUsingAI) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Write with AI</CardTitle>
+            <CardDescription>
+              Provide a brief description of the patient's condition and we'll generate a complete {noteType === 'SOAP' ? 'SOAP note' : noteType === 'H&P' ? 'History & Physical' : 'Progress Note'} for you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Textarea
+              placeholder="Example: 45-year-old male presenting with fever and cough for 3 days. Patient reports fatigue and mild shortness of breath."
+              value={quickPrompt}
+              onChange={(e) => setQuickPrompt(e.target.value)}
+              className="min-h-[150px]"
+            />
+            
+            <div className="flex justify-end space-x-2">
+              <CustomButton
+                type="button"
+                variant="outline"
+                onClick={() => setIsUsingAI(false)}
+              >
+                Cancel
+              </CustomButton>
+              
+              <CustomButton
+                type="button"
+                variant="primary"
+                disabled={isGeneratingWithAI || !quickPrompt.trim()}
+                onClick={handleEnhanceWithAI}
+                className="flex items-center gap-2"
+              >
+                {isGeneratingWithAI ? (
+                  <>
+                    <div className="animate-pulse">Generating...</div>
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 backdrop-blur-sm rounded-md">
+                      <div className="animate-spin h-8 w-8 border-4 border-medsync-600 border-t-transparent rounded-full"></div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4" />
+                    Generate Complete Note
+                  </>
+                )}
+              </CustomButton>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+    
+    if (inputMethod === 'voice') {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Record Your Note</CardTitle>
+            <CardDescription>
+              Click the microphone button and start speaking
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <button
+                type="button"
+                className={`p-6 rounded-full transition-colors ${isRecording 
+                  ? 'bg-red-100 hover:bg-red-200 text-red-600 animate-pulse' 
+                  : 'bg-medsync-100 hover:bg-medsync-200 text-medsync-600'}`}
+                onClick={isRecording ? stopRecording : startRecording}
+              >
+                <Mic className="h-8 w-8" />
+              </button>
+              <p className="text-neutral-500">
+                {isRecording 
+                  ? 'Recording... Click to stop' 
+                  : 'Click to start recording'}
+              </p>
+              
+              {noteContent && (
+                <div className="w-full mt-4 p-4 border rounded-md bg-neutral-50 dark:bg-neutral-800/50">
+                  <p className="text-sm font-medium mb-2">Transcription:</p>
+                  <p>{noteContent}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Text input mode with different note templates
+    switch (noteType) {
+      case 'SOAP':
+        return (
+          <SOAPNote 
+            noteContent={noteContent}
+            setNoteContent={setNoteContent}
+            enhanceWithAI={handleEnhanceWithAI}
+            isGeneratingWithAI={isGeneratingWithAI}
+          />
+        );
+      case 'H&P':
+        return (
+          <HPNote 
+            noteContent={noteContent}
+            setNoteContent={setNoteContent}
+            enhanceWithAI={handleEnhanceWithAI}
+            isGeneratingWithAI={isGeneratingWithAI}
+          />
+        );
+      default:
+        return (
+          <ProgressNote 
+            noteContent={noteContent}
+            setNoteContent={setNoteContent}
+            enhanceWithAI={handleEnhanceWithAI}
+            isGeneratingWithAI={isGeneratingWithAI}
+          />
+        );
+    }
+  };
+  
   const renderStep = () => {
     switch (step) {
       case 'select-type':
@@ -318,61 +472,6 @@ const NewConsultation = () => {
                     variant="primary"
                     size="md"
                     className="mt-4"
-                    onClick={() => setStep('input-method')}
-                  >
-                    Continue <ArrowRight className="ml-2 h-4 w-4" />
-                  </CustomButton>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-        
-      case 'input-method':
-        return (
-          <div className="max-w-md mx-auto">
-            <h1 className="text-3xl font-bold mb-8 text-center">Input Method</h1>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>How would you like to create your note?</CardTitle>
-                <CardDescription>
-                  Choose your preferred input method
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div 
-                    className={`flex flex-col items-center justify-center p-6 border rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-800/50 cursor-pointer transition-all ${inputMethod === 'text' ? 'ring-2 ring-medsync-500 bg-neutral-50 dark:bg-neutral-800/50' : ''}`}
-                    onClick={() => setInputMethod('text')}
-                  >
-                    <Keyboard className="h-12 w-12 text-medsync-600 mb-3" />
-                    <span className="text-sm font-medium">Type</span>
-                  </div>
-                  
-                  <div 
-                    className={`flex flex-col items-center justify-center p-6 border rounded-md hover:bg-neutral-50 dark:hover:bg-neutral-800/50 cursor-pointer transition-all ${inputMethod === 'voice' ? 'ring-2 ring-medsync-500 bg-neutral-50 dark:bg-neutral-800/50' : ''}`}
-                    onClick={() => setInputMethod('voice')}
-                  >
-                    <Mic className="h-12 w-12 text-medsync-600 mb-3" />
-                    <span className="text-sm font-medium">Voice</span>
-                  </div>
-                </div>
-                
-                <div className="flex justify-between">
-                  <CustomButton 
-                    type="button" 
-                    variant="outline"
-                    size="md"
-                    onClick={() => setStep('select-type')}
-                  >
-                    Back
-                  </CustomButton>
-                  
-                  <CustomButton 
-                    type="button" 
-                    variant="primary"
-                    size="md"
                     onClick={() => setStep('create')}
                   >
                     Continue <ArrowRight className="ml-2 h-4 w-4" />
@@ -386,7 +485,7 @@ const NewConsultation = () => {
       case 'create':
         return (
           <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold mb-8 text-center">
+            <h1 className="text-3xl font-bold mb-6 text-center">
               {noteType === 'SOAP' ? 'SOAP Note' : 
                noteType === 'H&P' ? 'History & Physical' : 'Progress Note'}
             </h1>
@@ -425,74 +524,43 @@ const NewConsultation = () => {
             </Card>
             
             <Card>
-              <CardHeader>
-                <CardTitle>{inputMethod === 'text' ? 'Type Your Note' : 'Record Your Note'}</CardTitle>
-                <CardDescription>
-                  {inputMethod === 'text' 
-                    ? 'Type your clinical notes below' 
-                    : 'Click the microphone button and start speaking'}
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Create Note</CardTitle>
+                  <CardDescription>
+                    Choose your input method and create your note
+                  </CardDescription>
+                </div>
+                
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  {/* Segmented control for input method */}
+                  <SegmentedControl
+                    value={inputMethod}
+                    onValueChange={(value) => setInputMethod(value as 'text' | 'voice')}
+                    options={[
+                      { value: 'text', label: 'Type', icon: <Keyboard className="h-4 w-4" /> },
+                      { value: 'voice', label: 'Voice', icon: <Mic className="h-4 w-4" /> }
+                    ]}
+                    className="min-w-52"
+                  />
+                  
+                  {/* Write with AI Button - only show in text mode */}
+                  {inputMethod === 'text' && !isUsingAI && (
+                    <CustomButton
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsUsingAI(true)}
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Brain className="h-4 w-4" />
+                      Write with AI
+                    </CustomButton>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                {inputMethod === 'text' ? (
-                  <div className="space-y-4">
-                    <Textarea
-                      placeholder="Enter your clinical notes here..."
-                      className="min-h-[200px]"
-                      value={noteContent}
-                      onChange={(e) => setNoteContent(e.target.value)}
-                    />
-                    
-                    <div className="flex justify-end">
-                      <CustomButton
-                        type="button"
-                        variant="secondary"
-                        size="md"
-                        disabled={isGeneratingWithAI}
-                        onClick={handleEnhanceWithAI}
-                        className="flex items-center gap-2"
-                      >
-                        {isGeneratingWithAI ? (
-                          <>
-                            <div className="animate-pulse">Enhancing...</div>
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/5 backdrop-blur-sm rounded-md">
-                              <div className="animate-spin h-8 w-8 border-4 border-medsync-600 border-t-transparent rounded-full"></div>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4" />
-                            Enhance with AI
-                          </>
-                        )}
-                      </CustomButton>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center space-y-4">
-                    <button
-                      type="button"
-                      className={`p-6 rounded-full transition-colors ${isRecording 
-                        ? 'bg-red-100 hover:bg-red-200 text-red-600 animate-pulse' 
-                        : 'bg-medsync-100 hover:bg-medsync-200 text-medsync-600'}`}
-                      onClick={isRecording ? stopRecording : startRecording}
-                    >
-                      <Mic className="h-8 w-8" />
-                    </button>
-                    <p className="text-neutral-500">
-                      {isRecording 
-                        ? 'Recording... Click to stop' 
-                        : 'Click to start recording'}
-                    </p>
-                    
-                    {noteContent && (
-                      <div className="w-full mt-4 p-4 border rounded-md bg-neutral-50 dark:bg-neutral-800/50">
-                        <p className="text-sm font-medium mb-2">Transcription:</p>
-                        <p>{noteContent}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {renderNoteEditor()}
               </CardContent>
             </Card>
             
@@ -501,7 +569,7 @@ const NewConsultation = () => {
                 type="button"
                 variant="outline"
                 size="md"
-                onClick={() => setStep('input-method')}
+                onClick={() => setStep('select-type')}
               >
                 Back
               </CustomButton>
@@ -510,7 +578,7 @@ const NewConsultation = () => {
                 type="submit" 
                 variant="primary"
                 size="md"
-                disabled={isLoading}
+                disabled={isLoading || !noteContent.trim()}
               >
                 {isLoading ? "Creating..." : "Create Consultation"}
               </CustomButton>
@@ -524,8 +592,9 @@ const NewConsultation = () => {
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
+        <SidebarOpener />
         
-        <SidebarInset className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-indigo-950">
+        <SidebarInset className="bg-gradient-blue">
           <div className="container px-4 py-12">
             {renderStep()}
           </div>

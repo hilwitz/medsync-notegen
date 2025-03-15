@@ -6,23 +6,6 @@ import { useSidebar } from '@/components/ui/sidebar';
 
 export const SidebarOpener = () => {
   const { state, toggleSidebar } = useSidebar();
-  const [isVisible, setIsVisible] = useState(false);
-  
-  // Show the button when sidebar is collapsed
-  useEffect(() => {
-    if (state === 'collapsed') {
-      setIsVisible(true);
-    } else {
-      // Add a small delay before hiding to avoid flicker
-      const timeout = setTimeout(() => {
-        setIsVisible(false);
-      }, 300);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [state]);
-  
-  if (!isVisible) return null;
   
   return (
     <div className="fixed top-4 left-4 z-50">

@@ -7,14 +7,14 @@ import { Brain, FileText } from 'lucide-react';
 interface ProgressNoteProps {
   noteContent: string;
   setNoteContent: (content: string) => void;
-  enhanceWithAI?: (content: string) => void;
+  onWriteWithAI?: () => void;
   isGeneratingWithAI?: boolean;
 }
 
 export const ProgressNote = ({ 
   noteContent = '', 
   setNoteContent,
-  enhanceWithAI,
+  onWriteWithAI,
   isGeneratingWithAI = false
 }: ProgressNoteProps) => {
   // Parse the note content as JSON or create default structure

@@ -8,6 +8,7 @@ import { CustomButton } from '@/components/ui/CustomButton';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import ConsultationDialog from '@/components/ConsultationDialog';
 
 interface Consultation {
   id: string;
@@ -25,16 +27,20 @@ interface Consultation {
 }
 
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState<'recent' | 'all' | 'templates'>('recent');
+  const [activeTab, setActiveTab] = useState<'recent' | 'all'>('recent');
   const [userName, setUserName] = useState('');
   const [recentConsultations, setRecentConsultations] = useState<Consultation[]>([]);
   const [allConsultations, setAllConsultations] = useState<Consultation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
-    todayCount: 0,
-    pendingCount: 0,
-    completedCount: 0
+    totalPatients: 0,
+    totalConsultations: 0,
+    consultationsThisMonth: 0
   });
+  const [selectedConsultation, setSelectedConsultation] = useState<any>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [consultationPatientName, setConsultationPatientName] = useState('');
+  
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -69,11 +75,13 @@ const Dashboard = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Get today's date at midnight for comparison
+        // Get today's date and first day of current month
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        // Fetch all consultations to calculate stats and recent ones
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        
+        // Fetch all consultations to calculate stats
         const { data: consultationsData, error } = await supabase
           .from('consultations')
           .select(`
@@ -82,6 +90,7 @@ const Dashboard = () => {
             status, 
             date, 
             created_at,
+            content,
             patients(first_name, last_name)
           `)
           .eq('user_id', user.id)
@@ -89,25 +98,25 @@ const Dashboard = () => {
 
         if (error) throw error;
 
+        // Fetch total patients count
+        const { count: patientCount, error: patientError } = await supabase
+          .from('patients')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        if (patientError) throw patientError;
+
         if (consultationsData) {
           // Calculate stats
-          const todayConsultations = consultationsData.filter(consult => {
+          const thisMonthConsultations = consultationsData.filter(consult => {
             const consultDate = new Date(consult.date);
-            return consultDate >= today;
+            return consultDate >= firstDayOfMonth;
           });
           
-          const pendingConsultations = consultationsData.filter(consult => 
-            consult.status === 'in_progress'
-          );
-          
-          const completedConsultations = consultationsData.filter(consult => 
-            consult.status === 'completed'
-          );
-          
           setStats({
-            todayCount: todayConsultations.length,
-            pendingCount: pendingConsultations.length,
-            completedCount: completedConsultations.length
+            totalPatients: patientCount || 0,
+            totalConsultations: consultationsData.length,
+            consultationsThisMonth: thisMonthConsultations.length
           });
 
           // Format all consultations for display
@@ -166,22 +175,6 @@ const Dashboard = () => {
       setRecentConsultations(updateConsultationStatus(recentConsultations));
       setAllConsultations(updateConsultationStatus(allConsultations));
 
-      // Update stats
-      const updatedConsultations = allConsultations.map(consult => 
-        consult.id === consultationId 
-          ? {...consult, status: mapStatus(newStatus)} 
-          : consult
-      );
-
-      const pendingCount = updatedConsultations.filter(consult => consult.status === 'in_progress').length;
-      const completedCount = updatedConsultations.filter(consult => consult.status === 'completed').length;
-
-      setStats({
-        ...stats,
-        pendingCount,
-        completedCount
-      });
-
       toast({
         title: "Status Updated",
         description: "Consultation status has been updated"
@@ -210,8 +203,40 @@ const Dashboard = () => {
     navigate('/consultations/new');
   };
 
-  const handleViewConsultation = (id: string) => {
-    navigate(`/consultations/${id}`);
+  const handleViewConsultation = async (id: string) => {
+    try {
+      // Fetch the full consultation data
+      const { data, error } = await supabase
+        .from('consultations')
+        .select(`
+          *,
+          patients (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setSelectedConsultation(data);
+        if (data.patients) {
+          setConsultationPatientName(`${data.patients.first_name} ${data.patients.last_name}`);
+        } else {
+          setConsultationPatientName('Unknown Patient');
+        }
+        setDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error fetching consultation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load consultation details",
+        variant: "destructive"
+      });
+    }
   };
 
   const statusColor = {
@@ -222,8 +247,7 @@ const Dashboard = () => {
 
   const tabs = [
     { id: 'recent', label: 'Recent Consultations' },
-    { id: 'all', label: 'All Consultations' },
-    { id: 'templates', label: 'Note Templates' }
+    { id: 'all', label: 'All Consultations' }
   ];
 
   const renderConsultationsTable = (consultations: Consultation[]) => {
@@ -310,7 +334,7 @@ const Dashboard = () => {
   };
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
         
@@ -338,9 +362,9 @@ const Dashboard = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {[
-                { title: 'Today\'s Consultations', value: stats.todayCount.toString(), icon: 'calendar' },
-                { title: 'Pending Notes', value: stats.pendingCount.toString(), icon: 'document' },
-                { title: 'Completed Notes', value: stats.completedCount.toString(), icon: 'check' }
+                { title: 'Total Patients', value: stats.totalPatients.toString(), icon: 'users' },
+                { title: 'Total Consultations', value: stats.totalConsultations.toString(), icon: 'document' },
+                { title: 'Consultations This Month', value: stats.consultationsThisMonth.toString(), icon: 'calendar' }
               ].map((stat, index) => (
                 <div key={index} className="glass-card p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
                   <div className="flex items-center justify-between">
@@ -359,9 +383,9 @@ const Dashboard = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       )}
-                      {stat.icon === 'check' && (
+                      {stat.icon === 'users' && (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                       )}
                     </div>
@@ -402,17 +426,18 @@ const Dashboard = () => {
                     {renderConsultationsTable(allConsultations)}
                   </div>
                 )}
-                
-                {activeTab === 'templates' && (
-                  <div className="flex items-center justify-center h-40 text-neutral-500 dark:text-neutral-400">
-                    Your note templates will be displayed here
-                  </div>
-                )}
               </div>
             </div>
           </div>
         </SidebarInset>
       </div>
+      
+      <ConsultationDialog 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen} 
+        consultation={selectedConsultation}
+        patientName={consultationPatientName}
+      />
     </SidebarProvider>
   );
 };

@@ -17,7 +17,6 @@ import {
   Home, 
   User, 
   Settings, 
-  FileText, 
   Users, 
   LogOut,
   FilePlus
@@ -92,14 +91,6 @@ const DashboardSidebar = () => {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isActive('/notes')}>
-                <Link to="/notes">
-                  <FileText className="w-5 h-5 text-blue-500" />
-                  <span className="text-blue-500">Notes</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup>
@@ -133,9 +124,9 @@ const DashboardSidebar = () => {
       <SidebarFooter>
         <div className="p-4 text-xs text-center text-gray-500">
           MedSync v1.0.0
+          <p className="mt-1 text-gray-400 text-[10px]">A product by Hilwitz</p>
         </div>
       </SidebarFooter>
-      <SidebarTrigger />
     </Sidebar>
   );
 };

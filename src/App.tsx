@@ -18,17 +18,29 @@ import Notes from "./pages/Notes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Features from "./pages/Features";
+import VerifyEmail from "./pages/VerifyEmail";
+import SubscriptionManager from "./components/SubscriptionManager";
+import { useToast } from "./hooks/use-toast";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showSubscription, setShowSubscription] = useState(false);
+  const [patientsCount, setPatientsCount] = useState(0);
+  const [consultationsCount, setConsultationsCount] = useState(0);
+  const [isPremium, setIsPremium] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) {
+        checkPremiumStatus(session.user.email);
+        checkLimits(session.user.id);
+      }
       setLoading(false);
     });
 
@@ -36,6 +48,10 @@ const App = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
+        if (session) {
+          checkPremiumStatus(session.user.email);
+          checkLimits(session.user.id);
+        }
         setLoading(false);
       }
     );
@@ -43,17 +59,102 @@ const App = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Protected route component
-  const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const checkPremiumStatus = (email: string | undefined) => {
+    if (email === "hilwitz.solutions@gmail.com") {
+      setIsPremium(true);
+    } else {
+      setIsPremium(false);
+    }
+  };
+
+  const checkLimits = async (userId: string) => {
+    try {
+      // Count patients
+      const { count: pCount, error: pError } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      
+      if (!pError) {
+        setPatientsCount(pCount || 0);
+      }
+      
+      // Count consultations
+      const { count: cCount, error: cError } = await supabase
+        .from('consultations')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      
+      if (!cError) {
+        setConsultationsCount(cCount || 0);
+      }
+    } catch (error) {
+      console.error("Error checking limits:", error);
+    }
+  };
+
+  // Check if user has reached limits before allowing new items
+  const checkSubscriptionLimits = (type: 'patient' | 'consultation') => {
+    if (isPremium) return true;
+    
+    if (type === 'patient' && patientsCount >= 1) {
+      toast({
+        title: "Free Plan Limit Reached",
+        description: "You've reached the limit of 1 patient on the free plan.",
+        variant: "destructive"
+      });
+      setShowSubscription(true);
+      return false;
+    }
+    
+    if (type === 'consultation' && consultationsCount >= 3) {
+      toast({
+        title: "Free Plan Limit Reached",
+        description: "You've reached the limit of 3 consultations on the free plan.",
+        variant: "destructive"
+      });
+      setShowSubscription(true);
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Protected route component with email verification check
+  const ProtectedRoute = ({ children, pageType }: { children: React.ReactNode, pageType?: 'new-patient' | 'new-consultation' | undefined }) => {
     if (loading) return <div>Loading...</div>;
     
     if (!session) {
       return <Navigate to="/auth" replace />;
     }
+
+    // Check if the user's email is verified
+    const userEmail = session.user?.email;
+    const isEmailVerified = session.user?.email_confirmed_at || userEmail === "hilwitz.solutions@gmail.com";
+    
+    if (!isEmailVerified) {
+      return <Navigate to="/verify-email" replace />;
+    }
+    
+    // Check subscription limits for specific pages
+    if (pageType === 'new-patient' && !checkSubscriptionLimits('patient')) {
+      return <Navigate to="/patients" replace />;
+    }
+    
+    if (pageType === 'new-consultation' && !checkSubscriptionLimits('consultation')) {
+      return <Navigate to="/dashboard" replace />;
+    }
     
     return (
       <div className="flex flex-col min-h-screen">
         {children}
+        {showSubscription && (
+          <SubscriptionManager 
+            open={showSubscription}
+            onOpenChange={setShowSubscription}
+            premiumEmail="hilwitz.solutions@gmail.com"
+          />
+        )}
       </div>
     );
   };
@@ -79,6 +180,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<HomeRoute />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/features" element={<Features />} />
               <Route path="/free-trial" element={<Navigate to="/auth" />} />
               
@@ -90,7 +192,7 @@ const App = () => {
               } />
               
               <Route path="/consultations/new" element={
-                <ProtectedRoute>
+                <ProtectedRoute pageType="new-consultation">
                   <NewConsultation />
                 </ProtectedRoute>
               } />

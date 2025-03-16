@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -28,10 +27,9 @@ import { Textarea } from '@/components/ui/textarea';
 import PatientSearch from '@/components/PatientSearch';
 import SOAPNote from '@/components/note-templates/SOAPNote';
 import HPNote from '@/components/note-templates/HPNote';
-import ProgressNote from '@/components/note-templates/ProgressNote';
+import { ProgressNote } from '@/components/note-templates/ProgressNote';
 
 const NewConsultation = () => {
-  // Get any state passed from patient view
   const location = useLocation();
   const initialPatientId = location.state?.patientId || '';
   const initialPatientFirstName = location.state?.patientFirstName || '';
@@ -40,7 +38,6 @@ const NewConsultation = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Form state
   const [selectedPatientId, setSelectedPatientId] = useState<string>(initialPatientId);
   const [patientName, setPatientName] = useState<string>(
     initialPatientFirstName && initialPatientLastName 
@@ -57,7 +54,6 @@ const NewConsultation = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isGeneratingWithAI, setIsGeneratingWithAI] = useState<boolean>(false);
   
-  // Reset note content when note type changes
   useEffect(() => {
     setNoteContent('');
   }, [noteType]);
@@ -89,7 +85,6 @@ const NewConsultation = () => {
     try {
       setIsLoading(true);
       
-      // Get the current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -101,10 +96,8 @@ const NewConsultation = () => {
         return;
       }
       
-      // Create date-time string from date and time inputs
       const dateTime = time ? `${date}T${time}:00` : `${date}T00:00:00`;
       
-      // Create consultation
       const { data, error } = await supabase
         .from('consultations')
         .insert({
@@ -131,7 +124,6 @@ const NewConsultation = () => {
         description: "Consultation created successfully!",
       });
       
-      // Navigate to the consultation detail page
       navigate(`/consultations/${data.id}`);
       
     } catch (error) {
@@ -163,7 +155,6 @@ const NewConsultation = () => {
     try {
       setIsGeneratingWithAI(true);
 
-      // Call the write-with-gemini function
       const { data, error } = await supabase.functions.invoke('write-with-gemini', {
         body: {
           noteType: noteType,
@@ -181,7 +172,6 @@ const NewConsultation = () => {
         throw new Error(data.error);
       }
 
-      // Set the generated content
       setNoteContent(data.note);
 
       toast({
@@ -268,7 +258,6 @@ const NewConsultation = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Left Column - Patient & Consultation Details */}
               <div className="md:col-span-1 space-y-6">
                 <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
                   <CardHeader>
@@ -283,7 +272,9 @@ const NewConsultation = () => {
                   <CardContent className="space-y-4">
                     {!selectedPatientId ? (
                       <div className="space-y-4">
-                        <PatientSearch onSelect={handlePatientSelect} />
+                        <PatientSearch 
+                          onSelect={handlePatientSelect as any} 
+                        />
                         
                         <p className="text-sm text-neutral-500 dark:text-neutral-400">
                           Search for a patient by name or add a new patient first.
@@ -409,7 +400,6 @@ const NewConsultation = () => {
                 </Card>
               </div>
               
-              {/* Right Column - Note Editor */}
               <Card className="md:col-span-2 shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
                 <CardHeader>
                   <CardTitle>

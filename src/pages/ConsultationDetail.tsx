@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -10,7 +11,7 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import SOAPNote from '@/components/note-templates/SOAPNote';
 import HPNote from '@/components/note-templates/HPNote';
-import ProgressNote from '@/components/note-templates/ProgressNote';
+import { ProgressNote } from '@/components/note-templates/ProgressNote';
 
 const ConsultationDetail = () => {
   const { id } = useParams();
@@ -50,7 +51,12 @@ const ConsultationDetail = () => {
       
       if (data) {
         setConsultation(data);
-        setNoteContent(data.content?.note || '');
+        // Fix: Only try to access note if content is an object
+        if (data.content && typeof data.content === 'object') {
+          setNoteContent(data.content.note || '');
+        } else {
+          setNoteContent('');
+        }
         
         if (data.patients) {
           setPatientName(`${data.patients.first_name} ${data.patients.last_name}`);

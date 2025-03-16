@@ -103,7 +103,11 @@ ${sections.assessment}
 ## Assessment and Plan
 
 `.trim();
-    setNoteContent(template);
+    
+    // Use setTimeout to avoid React warning about state updates during rendering
+    setTimeout(() => {
+      setNoteContent(template);
+    }, 0);
   }
   
   return (
@@ -148,6 +152,7 @@ ${sections.assessment}
             placeholder="Document the patient's chief complaint..."
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
+            spellCheck="false"
           />
         </TabsContent>
         
@@ -158,6 +163,7 @@ ${sections.assessment}
             placeholder="Document the history of present illness..."
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
+            spellCheck="false"
           />
         </TabsContent>
         
@@ -170,6 +176,7 @@ ${sections.assessment}
               placeholder="Document past medical history..."
               className="min-h-[150px] p-4 font-mono"
               readOnly={readOnly}
+              spellCheck="false"
             />
             
             <h4>Medications</h4>
@@ -179,6 +186,7 @@ ${sections.assessment}
               placeholder="Document current medications..."
               className="min-h-[100px] p-4 font-mono"
               readOnly={readOnly}
+              spellCheck="false"
             />
             
             <h4>Allergies</h4>
@@ -188,6 +196,7 @@ ${sections.assessment}
               placeholder="Document allergies..."
               className="min-h-[80px] p-4 font-mono"
               readOnly={readOnly}
+              spellCheck="false"
             />
             
             <h4>Family History</h4>
@@ -197,6 +206,7 @@ ${sections.assessment}
               placeholder="Document family history..."
               className="min-h-[80px] p-4 font-mono"
               readOnly={readOnly}
+              spellCheck="false"
             />
             
             <h4>Social History</h4>
@@ -206,6 +216,7 @@ ${sections.assessment}
               placeholder="Document social history..."
               className="min-h-[80px] p-4 font-mono"
               readOnly={readOnly}
+              spellCheck="false"
             />
             
             <h4>Review of Systems</h4>
@@ -215,6 +226,7 @@ ${sections.assessment}
               placeholder="Document review of systems..."
               className="min-h-[150px] p-4 font-mono"
               readOnly={readOnly}
+              spellCheck="false"
             />
           </div>
         </TabsContent>
@@ -226,6 +238,7 @@ ${sections.assessment}
             placeholder="Document physical examination findings..."
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
+            spellCheck="false"
           />
         </TabsContent>
         
@@ -236,6 +249,7 @@ ${sections.assessment}
             placeholder="Document assessment and plan..."
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
+            spellCheck="false"
           />
         </TabsContent>
       </Tabs>

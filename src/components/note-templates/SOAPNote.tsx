@@ -53,7 +53,7 @@ ${sections.plan}
     return match ? match[1].trim() : '';
   };
   
-  // Initialize with a template if empty - use useEffect to prevent render-time state updates
+  // Initialize with a template if empty
   if (!noteContent && !readOnly) {
     const template = `
 # SOAP Note

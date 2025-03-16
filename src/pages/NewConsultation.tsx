@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -54,7 +55,7 @@ const NewConsultation = () => {
   const [time, setTime] = useState<string>(format(new Date(), 'HH:mm'));
   const [noteType, setNoteType] = useState<string>('SOAP');
   const [status, setStatus] = useState<string>('scheduled');
-  const [chiefComplaint, setChiefComplaint] = useState<string>('');
+  const [patientSymptoms, setPatientSymptoms] = useState<string>('');
   const [medicalHistory, setMedicalHistory] = useState<string>('');
   const [noteContent, setNoteContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -113,7 +114,7 @@ const NewConsultation = () => {
           note_type: noteType,
           status: status,
           content: {
-            chief_complaint: chiefComplaint,
+            chief_complaint: patientSymptoms,
             medical_history: medicalHistory,
             note: noteContent
           }
@@ -149,10 +150,10 @@ const NewConsultation = () => {
   };
 
   const handleWriteWithAI = async () => {
-    if (!chiefComplaint && !medicalHistory) {
+    if (!patientSymptoms) {
       toast({
         title: "Error",
-        description: "Please provide at least some information about the patient's symptoms or medical history.",
+        description: "Please provide patient symptoms or chief complaint before generating with AI.",
         variant: "destructive"
       });
       return;
@@ -165,7 +166,7 @@ const NewConsultation = () => {
         body: {
           noteType: noteType,
           patientInfo: patientName,
-          symptoms: chiefComplaint,
+          symptoms: patientSymptoms,
           medicalHistory: medicalHistory
         }
       });
@@ -192,7 +193,7 @@ const NewConsultation = () => {
         description: `Failed to generate note: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
-    } finally {
+    } finally { 
       setIsGeneratingWithAI(false);
     }
   };
@@ -227,16 +228,7 @@ const NewConsultation = () => {
           />
         );
       default:
-        return (
-          <div className="p-4 border rounded-md">
-            <textarea
-              className="w-full h-64 p-2 border rounded-md"
-              value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
-              placeholder="Enter consultation notes here..."
-            />
-          </div>
-        );
+        return null;
     }
   };
   
@@ -265,7 +257,7 @@ const NewConsultation = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-1 space-y-6">
-                <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
+                <Card className="shadow-md border-blue-100 dark:border-blue-900">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <User className="h-5 w-5 text-blue-500" />
@@ -277,15 +269,7 @@ const NewConsultation = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {!selectedPatientId ? (
-                      <div className="space-y-4">
-                        <PatientSearch 
-                          onSelect={handlePatientSelect} 
-                        />
-                        
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                          Search for a patient by name or add a new patient first.
-                        </p>
-                      </div>
+                      <PatientSearch onSelect={handlePatientSelect} />
                     ) : (
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -309,15 +293,12 @@ const NewConsultation = () => {
                   </CardContent>
                 </Card>
                 
-                <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
+                <Card className="shadow-md border-blue-100 dark:border-blue-900">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-blue-500" />
                       Consultation Details
                     </CardTitle>
-                    <CardDescription>
-                      Enter consultation date and type
-                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
@@ -327,7 +308,6 @@ const NewConsultation = () => {
                         type="date" 
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        className="border-blue-200 focus:border-blue-400"
                       />
                     </div>
                     
@@ -338,14 +318,13 @@ const NewConsultation = () => {
                         type="time"
                         value={time}
                         onChange={(e) => setTime(e.target.value)}
-                        className="border-blue-200 focus:border-blue-400"
                       />
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="noteType">Note Type</Label>
                       <Select value={noteType} onValueChange={setNoteType}>
-                        <SelectTrigger id="noteType" className="border-blue-200 focus:border-blue-400">
+                        <SelectTrigger id="noteType">
                           <SelectValue placeholder="Select note type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -359,7 +338,7 @@ const NewConsultation = () => {
                     <div className="space-y-2">
                       <Label htmlFor="status">Status</Label>
                       <Select value={status} onValueChange={setStatus}>
-                        <SelectTrigger id="status" className="border-blue-200 focus:border-blue-400">
+                        <SelectTrigger id="status">
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -373,48 +352,48 @@ const NewConsultation = () => {
                   </CardContent>
                 </Card>
                 
-                <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
+                <Card className="shadow-md border-blue-100 dark:border-blue-900">
                   <CardHeader>
-                    <CardTitle>Patient Information</CardTitle>
+                    <CardTitle>Patient Information for AI</CardTitle>
                     <CardDescription>
-                      Enter patient details for this visit
+                      Enter information to generate notes with AI
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="chiefComplaint">Chief Complaint / Symptoms</Label>
+                      <Label htmlFor="patientSymptoms">Patient Symptoms / Chief Complaint</Label>
                       <Textarea
-                        id="chiefComplaint"
-                        value={chiefComplaint}
-                        onChange={(e) => setChiefComplaint(e.target.value)}
-                        placeholder="Describe the patient's main symptoms and concerns..."
-                        className="min-h-[100px] border-blue-200 focus:border-blue-400"
+                        id="patientSymptoms"
+                        value={patientSymptoms}
+                        onChange={(e) => setPatientSymptoms(e.target.value)}
+                        placeholder="Describe the patient's symptoms..."
+                        className="min-h-[100px]"
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="medicalHistory">Medical History</Label>
+                      <Label htmlFor="medicalHistory">Relevant Medical History</Label>
                       <Textarea
                         id="medicalHistory"
                         value={medicalHistory}
                         onChange={(e) => setMedicalHistory(e.target.value)}
-                        placeholder="Enter relevant medical history..."
-                        className="min-h-[100px] border-blue-200 focus:border-blue-400"
+                        placeholder="Enter any relevant medical history..."
+                        className="min-h-[100px]"
                       />
                     </div>
                   </CardContent>
                 </Card>
               </div>
               
-              <Card className="md:col-span-2 shadow-md hover:shadow-lg transition-shadow duration-300 border-blue-100 dark:border-blue-900">
+              <Card className="md:col-span-2 shadow-md border-blue-100 dark:border-blue-900">
                 <CardHeader>
                   <CardTitle>
                     {noteType === 'SOAP' ? 'SOAP Note' : 
                      noteType === 'H&P' ? 'History & Physical' : 
-                     noteType === 'Progress' ? 'Progress Note' : 'Consultation Note'}
+                     'Progress Note'}
                   </CardTitle>
                   <CardDescription>
-                    Create a detailed medical note for this consultation
+                    Write or generate a medical note for this consultation
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

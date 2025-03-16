@@ -9,3 +9,11 @@ export interface Patient {
   email?: string;
   medicalRecordNumber?: string;
 }
+
+export interface Consultation {
+  id: string;
+  patientName: string;
+  date: string;
+  status: 'completed' | 'in_progress' | 'scheduled';
+  noteType: 'SOAP' | 'H&P' | 'Progress';
+}

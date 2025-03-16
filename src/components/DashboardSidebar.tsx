@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { 
   Sidebar, 
@@ -19,7 +19,9 @@ import {
   Settings, 
   Users, 
   LogOut,
-  FilePlus
+  FilePlus,
+  CreditCard,
+  ShieldCheck
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +31,23 @@ const DashboardSidebar = () => {
   const location = useLocation();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+
+  useEffect(() => {
+    const checkSubscription = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Check if email matches premium email
+          setIsPremium(user.email === "hilwitz.solutions@gmail.com");
+        }
+      } catch (error) {
+        console.error('Error checking subscription:', error);
+      }
+    };
+    
+    checkSubscription();
+  }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -96,6 +115,21 @@ const DashboardSidebar = () => {
         <SidebarGroup>
           <SidebarGroupLabel>Account</SidebarGroupLabel>
           <SidebarMenu>
+            <SidebarMenuItem>
+              {isPremium ? (
+                <div className="flex items-center px-3 py-2 text-sm font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md">
+                  <ShieldCheck className="w-5 h-5 mr-2" />
+                  <span>Premium Account</span>
+                </div>
+              ) : (
+                <SidebarMenuButton asChild onClick={() => navigate('/settings')}>
+                  <button className="flex items-center text-amber-600 dark:text-amber-400">
+                    <CreditCard className="w-5 h-5" />
+                    <span>Free Account</span>
+                  </button>
+                </SidebarMenuButton>
+              )}
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={isActive('/profile')}>
                 <Link to="/profile">

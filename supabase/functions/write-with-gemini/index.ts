@@ -92,8 +92,8 @@ serve(async (req) => {
         Please format the note professionally as a medical document, using appropriate medical terminology.`;
     }
 
-    // Call Gemini API
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+    // Call Gemini API with the correct model (gemini-2.0-flash)
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -122,6 +122,7 @@ serve(async (req) => {
     
     // Check for errors in the Gemini API response
     if (data.error) {
+      console.error('Gemini API Error:', data.error);
       return new Response(
         JSON.stringify({ error: data.error.message || 'Error generating content with Gemini' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -35,7 +34,8 @@ const Dashboard = () => {
   const [stats, setStats] = useState({
     totalPatients: 0,
     totalConsultations: 0,
-    consultationsThisMonth: 0
+    consultationsThisMonth: 0,
+    consultationsToday: 0
   });
   const [selectedConsultation, setSelectedConsultation] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -61,7 +61,6 @@ const Dashboard = () => {
         if (profile && (profile.first_name || profile.last_name)) {
           setUserName(`${profile.first_name || ''} ${profile.last_name || ''}`.trim());
         } else {
-          // Use email as fallback
           setUserName(user.email?.split('@')[0] || 'User');
         }
       } catch (error) {
@@ -75,13 +74,12 @@ const Dashboard = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Get today's date and first day of current month
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split('T')[0];
         
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         
-        // Fetch all consultations to calculate stats
         const { data: consultationsData, error } = await supabase
           .from('consultations')
           .select(`
@@ -98,7 +96,6 @@ const Dashboard = () => {
 
         if (error) throw error;
 
-        // Fetch total patients count
         const { count: patientCount, error: patientError } = await supabase
           .from('patients')
           .select('id', { count: 'exact', head: true })
@@ -107,19 +104,23 @@ const Dashboard = () => {
         if (patientError) throw patientError;
 
         if (consultationsData) {
-          // Calculate stats
           const thisMonthConsultations = consultationsData.filter(consult => {
             const consultDate = new Date(consult.date);
             return consultDate >= firstDayOfMonth;
           });
           
+          const todaysConsultations = consultationsData.filter(consult => {
+            const consultDate = new Date(consult.date);
+            return consultDate.toISOString().split('T')[0] === todayStr;
+          });
+          
           setStats({
             totalPatients: patientCount || 0,
             totalConsultations: consultationsData.length,
-            consultationsThisMonth: thisMonthConsultations.length
+            consultationsThisMonth: thisMonthConsultations.length,
+            consultationsToday: todaysConsultations.length
           });
 
-          // Format all consultations for display
           const formattedConsultations: Consultation[] = consultationsData
             .map(consult => ({
               id: consult.id,
@@ -131,10 +132,8 @@ const Dashboard = () => {
               noteType: consult.note_type as 'SOAP' | 'H&P' | 'Progress'
             }));
 
-          // Set all consultations
           setAllConsultations(formattedConsultations);
           
-          // Set recent consultations (top 10)
           setRecentConsultations(formattedConsultations.slice(0, 10));
         }
       } catch (error) {
@@ -153,7 +152,6 @@ const Dashboard = () => {
     fetchConsultations();
   }, [toast]);
 
-  // Handle status change
   const handleStatusChange = async (consultationId: string, newStatus: string) => {
     try {
       const { error } = await supabase
@@ -163,7 +161,6 @@ const Dashboard = () => {
 
       if (error) throw error;
 
-      // Update the local state to reflect the changes
       const updateConsultationStatus = (consultations: Consultation[]) => {
         return consultations.map(consult => 
           consult.id === consultationId 
@@ -189,12 +186,12 @@ const Dashboard = () => {
     }
   };
 
-  // Map Supabase status to our UI status
   const mapStatus = (status: string): 'completed' | 'in_progress' | 'scheduled' => {
     const statusMap: Record<string, 'completed' | 'in_progress' | 'scheduled'> = {
       'completed': 'completed',
       'in_progress': 'in_progress',
-      'scheduled': 'scheduled'
+      'scheduled': 'scheduled',
+      'cancelled': 'scheduled'
     };
     return statusMap[status] || 'scheduled';
   };
@@ -205,7 +202,6 @@ const Dashboard = () => {
 
   const handleViewConsultation = async (id: string) => {
     try {
-      // Fetch the full consultation data
       const { data, error } = await supabase
         .from('consultations')
         .select(`
@@ -363,8 +359,8 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {[
                 { title: 'Total Patients', value: stats.totalPatients.toString(), icon: 'users' },
-                { title: 'Total Consultations', value: stats.totalConsultations.toString(), icon: 'document' },
-                { title: 'Consultations This Month', value: stats.consultationsThisMonth.toString(), icon: 'calendar' }
+                { title: 'Today\'s Consultations', value: stats.consultationsToday.toString(), icon: 'calendar' },
+                { title: 'Consultations This Month', value: stats.consultationsThisMonth.toString(), icon: 'document' }
               ].map((stat, index) => (
                 <div key={index} className="glass-card p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
                   <div className="flex items-center justify-between">

@@ -122,6 +122,7 @@ Follow-up:
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
             spellCheck="false"
+            // Remove any whitespace preprocessing
           />
         </TabsContent>
         
@@ -133,6 +134,7 @@ Follow-up:
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
             spellCheck="false"
+            // Remove any whitespace preprocessing
           />
         </TabsContent>
         
@@ -144,6 +146,7 @@ Follow-up:
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
             spellCheck="false"
+            // Remove any whitespace preprocessing
           />
         </TabsContent>
         
@@ -155,6 +158,7 @@ Follow-up:
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
             spellCheck="false"
+            // Remove any whitespace preprocessing
           />
         </TabsContent>
       </Tabs>

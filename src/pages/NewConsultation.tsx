@@ -29,6 +29,12 @@ import SOAPNote from '@/components/note-templates/SOAPNote';
 import HPNote from '@/components/note-templates/HPNote';
 import { ProgressNote } from '@/components/note-templates/ProgressNote';
 
+interface Patient {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
 const NewConsultation = () => {
   const location = useLocation();
   const initialPatientId = location.state?.patientId || '';
@@ -58,7 +64,7 @@ const NewConsultation = () => {
     setNoteContent('');
   }, [noteType]);
   
-  const handlePatientSelect = (patient: any) => {
+  const handlePatientSelect = (patient: Patient) => {
     setSelectedPatientId(patient.id);
     setPatientName(`${patient.first_name} ${patient.last_name}`);
   };
@@ -273,7 +279,7 @@ const NewConsultation = () => {
                     {!selectedPatientId ? (
                       <div className="space-y-4">
                         <PatientSearch 
-                          onSelect={handlePatientSelect as any} 
+                          onSelect={handlePatientSelect} 
                         />
                         
                         <p className="text-sm text-neutral-500 dark:text-neutral-400">

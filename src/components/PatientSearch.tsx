@@ -12,7 +12,11 @@ interface Patient {
   last_name: string;
 }
 
-const PatientSearch = () => {
+interface PatientSearchProps {
+  onSelect?: (patient: Patient) => void;
+}
+
+const PatientSearch = ({ onSelect }: PatientSearchProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -69,8 +73,12 @@ const PatientSearch = () => {
     }
   };
 
-  const handlePatientClick = (patientId: string) => {
-    navigate(`/patients/${patientId}`);
+  const handlePatientClick = (patient: Patient) => {
+    if (onSelect) {
+      onSelect(patient);
+    } else {
+      navigate(`/patients/${patient.id}`);
+    }
     setShowResults(false);
     setSearchTerm('');
   };
@@ -150,7 +158,7 @@ const PatientSearch = () => {
               <li 
                 key={patient.id} 
                 className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                onClick={() => handlePatientClick(patient.id)}
+                onClick={() => handlePatientClick(patient)}
               >
                 {patient.first_name} {patient.last_name}
               </li>

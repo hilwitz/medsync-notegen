@@ -51,9 +51,12 @@ const ConsultationDetail = () => {
       
       if (data) {
         setConsultation(data);
-        // Fix: Only try to access note if content is an object
-        if (data.content && typeof data.content === 'object') {
-          setNoteContent(data.content.note || '');
+        
+        // Fix: More robust type checking for content object
+        if (data.content && typeof data.content === 'object' && !Array.isArray(data.content)) {
+          // Type assertion to help TypeScript understand we're checking properly
+          const contentObj = data.content as Record<string, any>;
+          setNoteContent(contentObj.note || '');
         } else {
           setNoteContent('');
         }

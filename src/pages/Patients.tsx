@@ -1,12 +1,11 @@
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import PatientSearch from '@/components/PatientSearch';
 import { CustomButton } from '@/components/ui/CustomButton';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -16,27 +15,19 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Patient as PatientType } from '@/types';
-import { MoreVertical, Edit, Trash2 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -44,12 +35,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import PatientDetail from '@/components/PatientDetail';
+import { format, differenceInYears } from 'date-fns';
 
 interface PatientData {
   id: string;
@@ -80,27 +72,27 @@ const PatientList = () => {
     lastName: z.string().min(2, {
       message: "Last name must be at least 2 characters.",
     }),
-    dateOfBirth: z.date().optional(),
+    dateOfBirth: z.string().optional(),
     gender: z.string().optional(),
     phone: z.string().optional(),
     email: z.string().email({
       message: "Please enter a valid email.",
     }).optional(),
     medicalRecordNumber: z.string().optional(),
-  })
+  });
 
   const form = useForm<z.infer<typeof patientSchema>>({
     resolver: zodResolver(patientSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
-      dateOfBirth: undefined,
+      dateOfBirth: "",
       gender: "",
       phone: "",
       email: "",
       medicalRecordNumber: "",
     },
-  })
+  });
 
   useEffect(() => {
     fetchPatients();
@@ -116,11 +108,23 @@ const PatientList = () => {
         .from('patients')
         .select('*')
         .eq('user_id', user.id)
-        .order('lastName', { ascending: true });
+        .order('last_name', { ascending: true });
 
       if (error) throw error;
 
-      setPatients(data || []);
+      // Transform database fields to match our frontend PatientData interface
+      const transformedData: PatientData[] = (data || []).map(item => ({
+        id: item.id,
+        firstName: item.first_name,
+        lastName: item.last_name,
+        dateOfBirth: item.date_of_birth,
+        gender: item.gender,
+        phone: item.phone,
+        email: item.email,
+        medicalRecordNumber: item.medical_record_number
+      }));
+
+      setPatients(transformedData);
     } catch (error) {
       console.error('Error fetching patients:', error);
       toast({
@@ -148,12 +152,21 @@ const PatientList = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Transform our frontend data to match database schema
+      const patientData = {
+        first_name: values.firstName,
+        last_name: values.lastName,
+        date_of_birth: values.dateOfBirth,
+        gender: values.gender,
+        phone: values.phone,
+        email: values.email,
+        medical_record_number: values.medicalRecordNumber,
+        user_id: user.id
+      };
+
       const { error } = await supabase
         .from('patients')
-        .insert([{
-          ...values,
-          user_id: user.id
-        }]);
+        .insert([patientData]);
 
       if (error) throw error;
 
@@ -207,6 +220,7 @@ const PatientList = () => {
       // If the deleted patient was selected, clear the selection
       if (selectedPatient?.id === patientId) {
         setSelectedPatient(null);
+        setShowDetail(false);
       }
       
       toast({
@@ -225,44 +239,60 @@ const PatientList = () => {
     }
   };
 
-  const PatientCard = ({ patient }: { patient: PatientData }) => (
-    <div 
-      className={cn(
-        "p-4 rounded-lg cursor-pointer transition-all hover:shadow-md border",
-        selectedPatient?.id === patient.id 
-          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" 
-          : "border-gray-200 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-800"
-      )}
-      onClick={() => handlePatientSelect(patient)}
-    >
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="font-medium">{patient.firstName} {patient.lastName}</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {patient.gender && `${patient.gender} · `}
-            {patient.age && `${patient.age} years`}
-          </p>
-          {patient.medicalRecordNumber && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              MRN: {patient.medicalRecordNumber}
+  // Helper function to calculate age based on date of birth
+  const calculateAge = (dateOfBirth?: string) => {
+    if (!dateOfBirth) return null;
+    try {
+      const birthDate = new Date(dateOfBirth);
+      const today = new Date();
+      return differenceInYears(today, birthDate);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const PatientCard = ({ patient }: { patient: PatientData }) => {
+    const age = calculateAge(patient.dateOfBirth);
+    
+    return (
+      <div 
+        className={cn(
+          "p-4 rounded-lg cursor-pointer transition-all hover:shadow-md border",
+          selectedPatient?.id === patient.id 
+            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" 
+            : "border-gray-200 dark:border-gray-700 hover:border-blue-200 dark:hover:border-blue-800"
+        )}
+        onClick={() => handlePatientSelect(patient)}
+      >
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="font-medium">{patient.firstName} {patient.lastName}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {patient.gender && `${patient.gender} · `}
+              {age !== null && `${age} years`}
             </p>
-          )}
-        </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeletePatient(patient.id);
-            }}
-            className="p-1 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-            aria-label="Delete patient"
-          >
-            <Trash2 size={16} />
-          </button>
+            {patient.medicalRecordNumber && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                MRN: {patient.medicalRecordNumber}
+              </p>
+            )}
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeletePatient(patient.id);
+              }}
+              className="p-1 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+              aria-label="Delete patient"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -332,7 +362,10 @@ const PatientList = () => {
                             <FormItem>
                               <FormLabel>Date of Birth</FormLabel>
                               <FormControl>
-                                <Input type="date" {...field} />
+                                <Input 
+                                  type="date" 
+                                  {...field} 
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

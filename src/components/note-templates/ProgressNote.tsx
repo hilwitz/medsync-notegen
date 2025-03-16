@@ -9,13 +9,15 @@ interface ProgressNoteProps {
   setNoteContent: (content: string) => void;
   onWriteWithAI?: () => void;
   isGeneratingWithAI?: boolean;
+  readOnly?: boolean;
 }
 
 export const ProgressNote = ({ 
   noteContent = '', 
   setNoteContent,
   onWriteWithAI,
-  isGeneratingWithAI = false
+  isGeneratingWithAI = false,
+  readOnly = false
 }: ProgressNoteProps) => {
   // Parse the note content as JSON or create default structure
   const parsedContent = (() => {
@@ -29,6 +31,8 @@ export const ProgressNote = ({
   })();
   
   const handleContentChange = (value: string) => {
+    if (readOnly) return;
+    
     const updatedContent = {
       progress_note: value
     };
@@ -53,9 +57,10 @@ export const ProgressNote = ({
           className="min-h-[400px] border-blue-200 focus:border-blue-400"
           value={parsedContent.progress_note}
           onChange={(e) => handleContentChange(e.target.value)}
+          readOnly={readOnly}
         />
         
-        {onWriteWithAI && (
+        {onWriteWithAI && !readOnly && (
           <div className="mt-4 flex justify-end">
             <CustomButton
               type="button"

@@ -10,11 +10,14 @@ export interface SOAPNoteProps {
   setNoteContent: (content: string) => void;
   onWriteWithAI?: () => void;
   isGeneratingWithAI?: boolean;
+  readOnly?: boolean;
 }
 
-const SOAPNote = ({ noteContent, setNoteContent, onWriteWithAI, isGeneratingWithAI }: SOAPNoteProps) => {
+const SOAPNote = ({ noteContent, setNoteContent, onWriteWithAI, isGeneratingWithAI, readOnly = false }: SOAPNoteProps) => {
   // Function to update the note without affecting other sections
   const updateSection = (section: string, newContent: string) => {
+    if (readOnly) return;
+    
     const sections = {
       subjective: getSection('subjective'),
       objective: getSection('objective'),
@@ -51,7 +54,7 @@ ${sections.plan}
   };
   
   // Initialize with a template if empty
-  if (!noteContent) {
+  if (!noteContent && !readOnly) {
     const template = `
 # SOAP Note
 
@@ -75,7 +78,7 @@ Follow-up:
   
   return (
     <div className="space-y-4">
-      {onWriteWithAI && (
+      {onWriteWithAI && !readOnly && (
         <div className="flex justify-end mb-2">
           <CustomButton
             variant="secondary"
@@ -113,6 +116,7 @@ Follow-up:
             onChange={(e) => updateSection('subjective', e.target.value)}
             placeholder="Document patient's history, complaints, and symptoms..."
             className="min-h-[300px] p-4 font-mono"
+            readOnly={readOnly}
           />
         </TabsContent>
         
@@ -122,6 +126,7 @@ Follow-up:
             onChange={(e) => updateSection('objective', e.target.value)}
             placeholder="Document physical examination findings, vital signs, and test results..."
             className="min-h-[300px] p-4 font-mono"
+            readOnly={readOnly}
           />
         </TabsContent>
         
@@ -131,6 +136,7 @@ Follow-up:
             onChange={(e) => updateSection('assessment', e.target.value)}
             placeholder="Document diagnoses, interpretations, and clinical impressions..."
             className="min-h-[300px] p-4 font-mono"
+            readOnly={readOnly}
           />
         </TabsContent>
         
@@ -140,6 +146,7 @@ Follow-up:
             onChange={(e) => updateSection('plan', e.target.value)}
             placeholder="Document treatment plans, medications, and follow-up instructions..."
             className="min-h-[300px] p-4 font-mono"
+            readOnly={readOnly}
           />
         </TabsContent>
       </Tabs>

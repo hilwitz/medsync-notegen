@@ -10,11 +10,14 @@ export interface HPNoteProps {
   setNoteContent: (content: string) => void;
   onWriteWithAI?: () => void;
   isGeneratingWithAI?: boolean;
+  readOnly?: boolean;
 }
 
-const HPNote = ({ noteContent, setNoteContent, onWriteWithAI, isGeneratingWithAI }: HPNoteProps) => {
+const HPNote = ({ noteContent, setNoteContent, onWriteWithAI, isGeneratingWithAI, readOnly = false }: HPNoteProps) => {
   // Function to update the note without affecting other sections
   const updateSection = (section: string, newContent: string) => {
+    if (readOnly) return;
+    
     const sections = {
       chiefComplaint: getSection('Chief Complaint'),
       hpi: getSection('History of Present Illness'),
@@ -75,7 +78,7 @@ ${sections.assessment}
   };
   
   // Initialize with a template if empty
-  if (!noteContent) {
+  if (!noteContent && !readOnly) {
     const template = `
 # History and Physical
 
@@ -105,7 +108,7 @@ ${sections.assessment}
   
   return (
     <div className="space-y-4">
-      {onWriteWithAI && (
+      {onWriteWithAI && !readOnly && (
         <div className="flex justify-end mb-2">
           <CustomButton
             variant="secondary"
@@ -144,6 +147,7 @@ ${sections.assessment}
             onChange={(e) => updateSection('chiefComplaint', e.target.value)}
             placeholder="Document the patient's chief complaint..."
             className="min-h-[300px] p-4 font-mono"
+            readOnly={readOnly}
           />
         </TabsContent>
         
@@ -153,6 +157,7 @@ ${sections.assessment}
             onChange={(e) => updateSection('hpi', e.target.value)}
             placeholder="Document the history of present illness..."
             className="min-h-[300px] p-4 font-mono"
+            readOnly={readOnly}
           />
         </TabsContent>
         
@@ -164,6 +169,7 @@ ${sections.assessment}
               onChange={(e) => updateSection('pmh', e.target.value)}
               placeholder="Document past medical history..."
               className="min-h-[150px] p-4 font-mono"
+              readOnly={readOnly}
             />
             
             <h4>Medications</h4>
@@ -172,6 +178,7 @@ ${sections.assessment}
               onChange={(e) => updateSection('medications', e.target.value)}
               placeholder="Document current medications..."
               className="min-h-[100px] p-4 font-mono"
+              readOnly={readOnly}
             />
             
             <h4>Allergies</h4>
@@ -180,6 +187,7 @@ ${sections.assessment}
               onChange={(e) => updateSection('allergies', e.target.value)}
               placeholder="Document allergies..."
               className="min-h-[80px] p-4 font-mono"
+              readOnly={readOnly}
             />
             
             <h4>Family History</h4>
@@ -188,6 +196,7 @@ ${sections.assessment}
               onChange={(e) => updateSection('familyHistory', e.target.value)}
               placeholder="Document family history..."
               className="min-h-[80px] p-4 font-mono"
+              readOnly={readOnly}
             />
             
             <h4>Social History</h4>
@@ -196,6 +205,7 @@ ${sections.assessment}
               onChange={(e) => updateSection('socialHistory', e.target.value)}
               placeholder="Document social history..."
               className="min-h-[80px] p-4 font-mono"
+              readOnly={readOnly}
             />
             
             <h4>Review of Systems</h4>
@@ -204,6 +214,7 @@ ${sections.assessment}
               onChange={(e) => updateSection('ros', e.target.value)}
               placeholder="Document review of systems..."
               className="min-h-[150px] p-4 font-mono"
+              readOnly={readOnly}
             />
           </div>
         </TabsContent>
@@ -214,6 +225,7 @@ ${sections.assessment}
             onChange={(e) => updateSection('physicalExam', e.target.value)}
             placeholder="Document physical examination findings..."
             className="min-h-[300px] p-4 font-mono"
+            readOnly={readOnly}
           />
         </TabsContent>
         
@@ -223,6 +235,7 @@ ${sections.assessment}
             onChange={(e) => updateSection('assessment', e.target.value)}
             placeholder="Document assessment and plan..."
             className="min-h-[300px] p-4 font-mono"
+            readOnly={readOnly}
           />
         </TabsContent>
       </Tabs>

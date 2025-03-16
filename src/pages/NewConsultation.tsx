@@ -178,7 +178,7 @@ const NewConsultation = () => {
         throw new Error(data.error);
       }
 
-      setNoteContent(data.note);
+      setNoteContent(data.note || "");
 
       toast({
         title: "Success",

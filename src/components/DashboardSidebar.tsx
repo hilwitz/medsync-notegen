@@ -21,10 +21,12 @@ import {
   LogOut,
   FilePlus,
   CreditCard,
-  ShieldCheck
+  ShieldCheck,
+  FileText
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { format, addMonths } from 'date-fns';
 
 const DashboardSidebar = () => {
   const navigate = useNavigate();
@@ -32,6 +34,7 @@ const DashboardSidebar = () => {
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [premiumExpiryDate, setPremiumExpiryDate] = useState<Date | null>(null);
 
   useEffect(() => {
     const checkSubscription = async () => {
@@ -39,7 +42,13 @@ const DashboardSidebar = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           // Check if email matches premium email
-          setIsPremium(user.email === "hilwitz.solutions@gmail.com");
+          const isPremiumAccount = user.email === "hilwitz.solutions@gmail.com";
+          setIsPremium(isPremiumAccount);
+          
+          if (isPremiumAccount) {
+            // Set premium expiry to 1 month from today for demonstration
+            setPremiumExpiryDate(addMonths(new Date(), 1));
+          }
         }
       } catch (error) {
         console.error('Error checking subscription:', error);
@@ -110,6 +119,14 @@ const DashboardSidebar = () => {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isActive('/notes')}>
+                <Link to="/notes">
+                  <FileText className="w-5 h-5" />
+                  <span>Notes</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup>
@@ -117,9 +134,16 @@ const DashboardSidebar = () => {
           <SidebarMenu>
             <SidebarMenuItem>
               {isPremium ? (
-                <div className="flex items-center px-3 py-2 text-sm font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md">
-                  <ShieldCheck className="w-5 h-5 mr-2" />
-                  <span>Premium Account</span>
+                <div className="flex flex-col px-3 py-2 text-sm font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md">
+                  <div className="flex items-center">
+                    <ShieldCheck className="w-5 h-5 mr-2" />
+                    <span>Premium Account</span>
+                  </div>
+                  {premiumExpiryDate && (
+                    <span className="text-xs mt-1 ml-7 text-green-600 dark:text-green-400">
+                      Valid until {format(premiumExpiryDate, 'dd MMM yyyy')}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <SidebarMenuButton asChild onClick={() => navigate('/settings')}>

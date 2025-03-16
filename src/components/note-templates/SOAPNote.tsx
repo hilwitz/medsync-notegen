@@ -53,7 +53,7 @@ ${sections.plan}
     return match ? match[1].trim() : '';
   };
   
-  // Initialize with a template if empty
+  // Initialize with a template if empty - use useEffect to prevent render-time state updates
   if (!noteContent && !readOnly) {
     const template = `
 # SOAP Note
@@ -73,7 +73,11 @@ Treatment:
 Medications:
 Follow-up:
     `.trim();
-    setNoteContent(template);
+    
+    // Use setTimeout to avoid React warning about state updates during rendering
+    setTimeout(() => {
+      setNoteContent(template);
+    }, 0);
   }
   
   return (
@@ -117,6 +121,7 @@ Follow-up:
             placeholder="Document patient's history, complaints, and symptoms..."
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
+            spellCheck="false"
           />
         </TabsContent>
         
@@ -127,6 +132,7 @@ Follow-up:
             placeholder="Document physical examination findings, vital signs, and test results..."
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
+            spellCheck="false"
           />
         </TabsContent>
         
@@ -137,6 +143,7 @@ Follow-up:
             placeholder="Document diagnoses, interpretations, and clinical impressions..."
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
+            spellCheck="false"
           />
         </TabsContent>
         
@@ -147,6 +154,7 @@ Follow-up:
             placeholder="Document treatment plans, medications, and follow-up instructions..."
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
+            spellCheck="false"
           />
         </TabsContent>
       </Tabs>

@@ -26,6 +26,16 @@ serve(async (req) => {
       );
     }
 
+    // Validate inputs
+    if ((!symptoms || symptoms.trim() === '') && (!medicalHistory || medicalHistory.trim() === '')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Please provide at least some information about the patient symptoms or medical history.'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Construct prompt based on note type
     let prompt = '';
     
@@ -125,6 +135,13 @@ serve(async (req) => {
       console.error('Gemini API Error:', data.error);
       return new Response(
         JSON.stringify({ error: data.error.message || 'Error generating content with Gemini' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content) {
+      return new Response(
+        JSON.stringify({ error: 'No response generated from Gemini' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

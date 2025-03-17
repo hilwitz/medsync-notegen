@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 type User = {
   id: string;
-  email: string;
+  email?: string; // Changed from required to optional to match Supabase's User type
   user_metadata?: {
     name?: string;
   };

@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { addDays } from "https://deno.land/x/date_fns@v3.0.0/addDays.js";
+import { addDays } from "https://deno.land/x/date_fns@v3.0.0/index.js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

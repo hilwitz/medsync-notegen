@@ -29,6 +29,7 @@ import PatientSearch from '@/components/PatientSearch';
 import SOAPNote from '@/components/note-templates/SOAPNote';
 import HPNote from '@/components/note-templates/HPNote';
 import { ProgressNote } from '@/components/note-templates/ProgressNote';
+import SubscriptionConfirmation from '@/components/SubscriptionConfirmation';
 
 interface Patient {
   id: string;
@@ -59,10 +60,50 @@ const NewConsultation = () => {
   const [medicalHistory, setMedicalHistory] = useState<string>('');
   const [noteContent, setNoteContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isGeneratingWithAI, setIsGeneratingWithAI] = useState<boolean>(false);
+  const [consultationsCount, setConsultationsCount] = useState<number>(0);
+  const [isPremium, setIsPremium] = useState<boolean>(false);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState<boolean>(false);
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly' | null>(null);
   
   useEffect(() => {
     setNoteContent('');
+    
+    // Check if user is premium
+    const checkPremiumStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // First check if we have a subscription record
+        try {
+          const { data, error } = await supabase.functions.invoke('check-subscription', {
+            body: { userId: user.id }
+          });
+          
+          if (!error && data && data.isSubscribed) {
+            setIsPremium(true);
+            return;
+          }
+        } catch (e) {
+          console.log("Couldn't use check-subscription, falling back to email check");
+        }
+        
+        // Fallback to email check
+        setIsPremium(user.email === "hilwitz.solutions@gmail.com");
+        
+        // Count consultations for free users
+        if (user.email !== "hilwitz.solutions@gmail.com") {
+          const { count, error } = await supabase
+            .from('consultations')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id);
+          
+          if (!error) {
+            setConsultationsCount(count || 0);
+          }
+        }
+      }
+    };
+    
+    checkPremiumStatus();
   }, [noteType]);
   
   const handlePatientSelect = (patient: Patient) => {
@@ -92,7 +133,7 @@ const NewConsultation = () => {
     if (!noteContent.trim()) {
       toast({
         title: "Error",
-        description: "Please enter or generate consultation notes",
+        description: "Please enter consultation notes",
         variant: "destructive"
       });
       return;
@@ -109,6 +150,14 @@ const NewConsultation = () => {
           description: "You must be logged in to create a consultation",
           variant: "destructive"
         });
+        return;
+      }
+      
+      // Check if user has reached consultation limit
+      if (!isPremium && consultationsCount >= 1) {
+        // Show subscription dialog instead of error
+        setSelectedPlan('monthly');
+        setShowSubscriptionDialog(true);
         return;
       }
       
@@ -141,7 +190,13 @@ const NewConsultation = () => {
         description: "Consultation created successfully!",
       });
       
-      navigate(`/consultations/${data.id}`);
+      // If this is their first consultation (free tier), show the subscription dialog
+      if (!isPremium && consultationsCount === 0) {
+        setSelectedPlan('monthly');
+        setShowSubscriptionDialog(true);
+      } else {
+        navigate(`/consultations/${data.id}`);
+      }
       
     } catch (error) {
       console.error('Error creating consultation:', error);
@@ -158,62 +213,6 @@ const NewConsultation = () => {
   const handleBack = () => {
     navigate(-1);
   };
-
-  const handleWriteWithAI = async () => {
-    if (!patientSymptoms) {
-      toast({
-        title: "Error",
-        description: "Please provide patient symptoms or chief complaint before generating with AI.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setIsGeneratingWithAI(true);
-
-      const { data, error } = await supabase.functions.invoke('write-with-gemini', {
-        body: {
-          noteType: noteType,
-          patientInfo: patientName,
-          symptoms: patientSymptoms,
-          medicalHistory: medicalHistory
-        }
-      });
-
-      if (error) {
-        console.error("Supabase function error:", error);
-        throw new Error(error.message);
-      }
-
-      if (data.error) {
-        console.error("Gemini API error:", data.error);
-        throw new Error(data.error);
-      }
-
-      if (!data.note) {
-        throw new Error("No note content received from API");
-      }
-
-      console.log("Setting note content:", data.note.substring(0, 100) + "...");
-      setNoteContent(data.note);
-
-      toast({
-        title: "Success",
-        description: "Note generated successfully!"
-      });
-
-    } catch (error) {
-      console.error('Error generating note with AI:', error);
-      toast({
-        title: "Error",
-        description: `Failed to generate note: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive"
-      });
-    } finally { 
-      setIsGeneratingWithAI(false);
-    }
-  };
   
   const renderNoteTemplate = () => {
     switch (noteType) {
@@ -222,8 +221,6 @@ const NewConsultation = () => {
           <SOAPNote 
             noteContent={noteContent} 
             setNoteContent={setNoteContent}
-            onWriteWithAI={handleWriteWithAI}
-            isGeneratingWithAI={isGeneratingWithAI}
           />
         );
       case 'H&P':
@@ -231,8 +228,6 @@ const NewConsultation = () => {
           <HPNote 
             noteContent={noteContent} 
             setNoteContent={setNoteContent}
-            onWriteWithAI={handleWriteWithAI}
-            isGeneratingWithAI={isGeneratingWithAI}
           />
         );
       case 'Progress':
@@ -240,8 +235,6 @@ const NewConsultation = () => {
           <ProgressNote 
             noteContent={noteContent} 
             setNoteContent={setNoteContent}
-            onWriteWithAI={handleWriteWithAI}
-            isGeneratingWithAI={isGeneratingWithAI}
           />
         );
       default:
@@ -371,9 +364,9 @@ const NewConsultation = () => {
                 
                 <Card className="shadow-md border-blue-100 dark:border-blue-900">
                   <CardHeader>
-                    <CardTitle>Patient Information for AI</CardTitle>
+                    <CardTitle>Patient Information</CardTitle>
                     <CardDescription>
-                      Enter information to generate notes with AI
+                      Enter information about the patient
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -410,7 +403,7 @@ const NewConsultation = () => {
                      'Progress Note'}
                   </CardTitle>
                   <CardDescription>
-                    Write or generate a medical note for this consultation
+                    Write a medical note for this consultation
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -433,6 +426,12 @@ const NewConsultation = () => {
           </div>
         </SidebarInset>
       </div>
+      
+      <SubscriptionConfirmation
+        open={showSubscriptionDialog}
+        onOpenChange={setShowSubscriptionDialog}
+        plan={selectedPlan}
+      />
     </SidebarProvider>
   );
 };

@@ -14,7 +14,6 @@ import ConsultationDetail from "./pages/ConsultationDetail";
 import Patients from "./pages/Patients";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-import Notes from "./pages/Notes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Features from "./pages/Features";
@@ -59,11 +58,53 @@ const App = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Check subscription status when app loads
+  useEffect(() => {
+    const checkForNotifications = async () => {
+      if (session?.user?.id) {
+        try {
+          const { data, error } = await supabase.functions.invoke('check-subscription', {
+            body: { userId: session.user.id }
+          });
+          
+          if (!error && data) {
+            setIsPremium(data.isSubscribed);
+            
+            // Show notification for expiring subscription
+            if (data.isSubscribed && data.notificationDue) {
+              toast({
+                title: "Subscription Expiring Soon",
+                description: `Your premium subscription will expire in ${data.daysRemaining} day${data.daysRemaining > 1 ? 's' : ''}. Renew now to avoid interruption.`,
+                variant: "default"
+              });
+            }
+          }
+        } catch (e) {
+          console.error("Error checking subscription notifications:", e);
+        }
+      }
+    };
+    
+    if (session) {
+      checkForNotifications();
+    }
+  }, [session, toast]);
+
   const checkPremiumStatus = (email: string | undefined) => {
     if (email === "hilwitz.solutions@gmail.com") {
       setIsPremium(true);
     } else {
-      setIsPremium(false);
+      supabase.functions.invoke('check-subscription', {
+        body: { userId: session?.user?.id }
+      }).then(({ data, error }) => {
+        if (!error && data) {
+          setIsPremium(data.isSubscribed);
+        } else {
+          setIsPremium(false);
+        }
+      }).catch(() => {
+        setIsPremium(false);
+      });
     }
   };
 
@@ -107,10 +148,10 @@ const App = () => {
       return false;
     }
     
-    if (type === 'consultation' && consultationsCount >= 3) {
+    if (type === 'consultation' && consultationsCount >= 1) {
       toast({
         title: "Free Plan Limit Reached",
-        description: "You've reached the limit of 3 consultations on the free plan.",
+        description: "You've reached the limit of 1 consultation on the free plan.",
         variant: "destructive"
       });
       setShowSubscription(true);
@@ -122,7 +163,13 @@ const App = () => {
 
   // Protected route component with email verification check
   const ProtectedRoute = ({ children, pageType }: { children: React.ReactNode, pageType?: 'new-patient' | 'new-consultation' | undefined }) => {
-    if (loading) return <div>Loading...</div>;
+    if (loading) {
+      return (
+        <div className="flex h-screen w-full items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-900 dark:to-blue-950">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+        </div>
+      );
+    }
     
     if (!session) {
       return <Navigate to="/auth" replace />;
@@ -161,7 +208,13 @@ const App = () => {
 
   // Check if user is logged in for root route
   const HomeRoute = () => {
-    if (loading) return <div>Loading...</div>;
+    if (loading) {
+      return (
+        <div className="flex h-screen w-full items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-900 dark:to-blue-950">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+        </div>
+      );
+    }
     
     if (session) {
       return <Navigate to="/dashboard" replace />;
@@ -224,12 +277,6 @@ const App = () => {
               <Route path="/settings" element={
                 <ProtectedRoute>
                   <Settings />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/notes" element={
-                <ProtectedRoute>
-                  <Notes />
                 </ProtectedRoute>
               } />
               

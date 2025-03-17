@@ -1,269 +1,98 @@
 
-import { useState } from 'react';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CustomButton } from '@/components/ui/CustomButton';
-import { Wand2 } from 'lucide-react';
+import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
 
-export interface HPNoteProps {
+interface HPNoteProps {
   noteContent: string;
   setNoteContent: (content: string) => void;
-  onWriteWithAI?: () => void;
-  isGeneratingWithAI?: boolean;
-  readOnly?: boolean;
 }
 
-const HPNote = ({ noteContent, setNoteContent, onWriteWithAI, isGeneratingWithAI, readOnly = false }: HPNoteProps) => {
-  // Function to update the note without affecting other sections
-  const updateSection = (section: string, newContent: string) => {
-    if (readOnly) return;
-    
-    const sections = {
-      chiefComplaint: getSection('Chief Complaint'),
-      hpi: getSection('History of Present Illness'),
-      pmh: getSection('Past Medical History'),
-      medications: getSection('Medications'),
-      allergies: getSection('Allergies'),
-      familyHistory: getSection('Family History'),
-      socialHistory: getSection('Social History'),
-      ros: getSection('Review of Systems'),
-      physicalExam: getSection('Physical Examination'),
-      assessment: getSection('Assessment and Plan')
-    };
-    
-    sections[section as keyof typeof sections] = newContent;
-    
-    const newNote = `
-# History and Physical
+const HPNote = ({ noteContent, setNoteContent }: HPNoteProps) => {
+  // Parse the content if it exists
+  let history = '';
+  let physical = '';
+  let assessment = '';
+  let plan = '';
 
-## Chief Complaint
-${sections.chiefComplaint}
+  if (noteContent) {
+    try {
+      // Try to find sections by using headings
+      const historyMatch = noteContent.match(/History:([\s\S]*?)(?=Physical Examination:|$)/i);
+      const physicalMatch = noteContent.match(/Physical Examination:([\s\S]*?)(?=Assessment:|$)/i);
+      const assessmentMatch = noteContent.match(/Assessment:([\s\S]*?)(?=Plan:|$)/i);
+      const planMatch = noteContent.match(/Plan:([\s\S]*?)(?=$)/i);
 
-## History of Present Illness
-${sections.hpi}
-
-## Past Medical History
-${sections.pmh}
-
-## Medications
-${sections.medications}
-
-## Allergies
-${sections.allergies}
-
-## Family History
-${sections.familyHistory}
-
-## Social History
-${sections.socialHistory}
-
-## Review of Systems
-${sections.ros}
-
-## Physical Examination
-${sections.physicalExam}
-
-## Assessment and Plan
-${sections.assessment}
-`.trim();
-    
-    setNoteContent(newNote);
-  };
-  
-  // Function to extract a specific section from the note
-  const getSection = (section: string): string => {
-    const regex = new RegExp(`## ${section}\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
-    const match = noteContent.match(regex);
-    return match ? match[1].trim() : '';
-  };
-  
-  // Initialize with a template if empty
-  if (!noteContent && !readOnly) {
-    const template = `
-# History and Physical
-
-## Chief Complaint
-
-## History of Present Illness
-
-## Past Medical History
-
-## Medications
-
-## Allergies
-
-## Family History
-
-## Social History
-
-## Review of Systems
-
-## Physical Examination
-
-## Assessment and Plan
-
-`.trim();
-    
-    // Use setTimeout to avoid React warning about state updates during rendering
-    setTimeout(() => {
-      setNoteContent(template);
-    }, 0);
+      history = historyMatch ? historyMatch[1].trim() : '';
+      physical = physicalMatch ? physicalMatch[1].trim() : '';
+      assessment = assessmentMatch ? assessmentMatch[1].trim() : '';
+      plan = planMatch ? planMatch[1].trim() : '';
+    } catch (e) {
+      console.error("Error parsing H&P note:", e);
+    }
   }
-  
+
+  const updateNoteContent = () => {
+    const updatedContent = `History:
+${history}
+
+Physical Examination:
+${physical}
+
+Assessment:
+${assessment}
+
+Plan:
+${plan}`;
+    setNoteContent(updatedContent);
+  };
+
   return (
     <div className="space-y-4">
-      {onWriteWithAI && !readOnly && (
-        <div className="flex justify-end mb-2">
-          <CustomButton
-            variant="secondary"
-            size="sm"
-            onClick={onWriteWithAI}
-            disabled={isGeneratingWithAI}
-            className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
-          >
-            {isGeneratingWithAI ? (
-              <>
-                <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                <span>Generating...</span>
-              </>
-            ) : (
-              <>
-                <Wand2 className="h-4 w-4" />
-                <span>Write with AI</span>
-              </>
-            )}
-          </CustomButton>
-        </div>
-      )}
-      
-      <Tabs defaultValue="cc" className="w-full">
-        <TabsList className="grid grid-cols-5 mb-4">
-          <TabsTrigger value="cc">CC</TabsTrigger>
-          <TabsTrigger value="hpi">HPI</TabsTrigger>
-          <TabsTrigger value="pmh">PMH</TabsTrigger>
-          <TabsTrigger value="exam">Exam</TabsTrigger>
-          <TabsTrigger value="assessment">A/P</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="cc">
-          <Textarea
-            value={getSection('Chief Complaint')}
-            onChange={(e) => updateSection('chiefComplaint', e.target.value)}
-            placeholder="Document the patient's chief complaint..."
-            className="min-h-[300px] p-4 font-mono"
-            readOnly={readOnly}
-            spellCheck="false"
-          />
-        </TabsContent>
-        
-        <TabsContent value="hpi">
-          <Textarea
-            value={getSection('History of Present Illness')}
-            onChange={(e) => updateSection('hpi', e.target.value)}
-            placeholder="Document the history of present illness..."
-            className="min-h-[300px] p-4 font-mono"
-            readOnly={readOnly}
-            spellCheck="false"
-          />
-        </TabsContent>
-        
-        <TabsContent value="pmh">
-          <div className="space-y-4">
-            <h4>Past Medical History</h4>
-            <Textarea
-              value={getSection('Past Medical History')}
-              onChange={(e) => updateSection('pmh', e.target.value)}
-              placeholder="Document past medical history..."
-              className="min-h-[150px] p-4 font-mono"
-              readOnly={readOnly}
-              spellCheck="false"
-            />
-            
-            <h4>Medications</h4>
-            <Textarea
-              value={getSection('Medications')}
-              onChange={(e) => updateSection('medications', e.target.value)}
-              placeholder="Document current medications..."
-              className="min-h-[100px] p-4 font-mono"
-              readOnly={readOnly}
-              spellCheck="false"
-            />
-            
-            <h4>Allergies</h4>
-            <Textarea
-              value={getSection('Allergies')}
-              onChange={(e) => updateSection('allergies', e.target.value)}
-              placeholder="Document allergies..."
-              className="min-h-[80px] p-4 font-mono"
-              readOnly={readOnly}
-              spellCheck="false"
-            />
-            
-            <h4>Family History</h4>
-            <Textarea
-              value={getSection('Family History')}
-              onChange={(e) => updateSection('familyHistory', e.target.value)}
-              placeholder="Document family history..."
-              className="min-h-[80px] p-4 font-mono"
-              readOnly={readOnly}
-              spellCheck="false"
-            />
-            
-            <h4>Social History</h4>
-            <Textarea
-              value={getSection('Social History')}
-              onChange={(e) => updateSection('socialHistory', e.target.value)}
-              placeholder="Document social history..."
-              className="min-h-[80px] p-4 font-mono"
-              readOnly={readOnly}
-              spellCheck="false"
-            />
-            
-            <h4>Review of Systems</h4>
-            <Textarea
-              value={getSection('Review of Systems')}
-              onChange={(e) => updateSection('ros', e.target.value)}
-              placeholder="Document review of systems..."
-              className="min-h-[150px] p-4 font-mono"
-              readOnly={readOnly}
-              spellCheck="false"
-            />
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="exam">
-          <Textarea
-            value={getSection('Physical Examination')}
-            onChange={(e) => updateSection('physicalExam', e.target.value)}
-            placeholder="Document physical examination findings..."
-            className="min-h-[300px] p-4 font-mono"
-            readOnly={readOnly}
-            spellCheck="false"
-          />
-        </TabsContent>
-        
-        <TabsContent value="assessment">
-          <Textarea
-            value={getSection('Assessment and Plan')}
-            onChange={(e) => updateSection('assessment', e.target.value)}
-            placeholder="Document assessment and plan..."
-            className="min-h-[300px] p-4 font-mono"
-            readOnly={readOnly}
-            spellCheck="false"
-          />
-        </TabsContent>
-      </Tabs>
-      
-      <div className="mt-4">
-        <details>
-          <summary className="cursor-pointer text-sm text-neutral-500 dark:text-neutral-400">
-            Preview Full Note
-          </summary>
-          <div className="mt-2 p-4 bg-neutral-50 dark:bg-neutral-900 rounded-md border border-neutral-200 dark:border-neutral-800 whitespace-pre-wrap font-mono text-sm">
-            {noteContent}
-          </div>
-        </details>
-      </div>
+      <Card className="p-4">
+        <label className="block text-sm font-medium mb-2">History</label>
+        <Textarea
+          value={history}
+          onChange={(e) => {
+            history = e.target.value;
+            updateNoteContent();
+          }}
+          placeholder="Enter patient's history, including chief complaint, HPI, past medical history, medications, allergies, family history, social history, etc."
+          className="min-h-[150px] mb-4"
+        />
+
+        <label className="block text-sm font-medium mb-2">Physical Examination</label>
+        <Textarea
+          value={physical}
+          onChange={(e) => {
+            physical = e.target.value;
+            updateNoteContent();
+          }}
+          placeholder="Enter physical examination findings, including vitals, general appearance, and system-specific findings."
+          className="min-h-[150px] mb-4"
+        />
+
+        <label className="block text-sm font-medium mb-2">Assessment</label>
+        <Textarea
+          value={assessment}
+          onChange={(e) => {
+            assessment = e.target.value;
+            updateNoteContent();
+          }}
+          placeholder="Enter your assessment, diagnoses, clinical impressions, etc."
+          className="min-h-[100px] mb-4"
+        />
+
+        <label className="block text-sm font-medium mb-2">Plan</label>
+        <Textarea
+          value={plan}
+          onChange={(e) => {
+            plan = e.target.value;
+            updateNoteContent();
+          }}
+          placeholder="Enter your treatment plan, medications, follow-up, etc."
+          className="min-h-[100px]"
+        />
+      </Card>
     </div>
   );
 };

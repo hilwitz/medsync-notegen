@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Sidebar, SidebarGroup, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Sidebar, SidebarGroup, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { User, FilePenLine, Users, Settings, Home, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

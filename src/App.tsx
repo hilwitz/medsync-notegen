@@ -37,7 +37,7 @@ const App = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        checkPremiumStatus(session.user.email);
+        checkPremiumStatus(session.user.id);
         checkLimits(session.user.id);
       }
       setLoading(false);
@@ -48,7 +48,7 @@ const App = () => {
       (_event, session) => {
         setSession(session);
         if (session) {
-          checkPremiumStatus(session.user.email);
+          checkPremiumStatus(session.user.id);
           checkLimits(session.user.id);
         }
         setLoading(false);
@@ -90,21 +90,20 @@ const App = () => {
     }
   }, [session, toast]);
 
-  const checkPremiumStatus = (email: string | undefined) => {
-    if (email === "hilwitz.solutions@gmail.com") {
-      setIsPremium(true);
-    } else {
-      supabase.functions.invoke('check-subscription', {
-        body: { userId: session?.user?.id }
-      }).then(({ data, error }) => {
-        if (!error && data) {
-          setIsPremium(data.isSubscribed);
-        } else {
-          setIsPremium(false);
-        }
-      }).catch(() => {
-        setIsPremium(false);
+  const checkPremiumStatus = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription', {
+        body: { userId }
       });
+      
+      if (!error && data) {
+        setIsPremium(data.isSubscribed);
+      } else {
+        setIsPremium(false);
+      }
+    } catch (e) {
+      console.error("Error checking premium status:", e);
+      setIsPremium(false);
     }
   };
 
@@ -199,7 +198,6 @@ const App = () => {
           <SubscriptionManager 
             open={showSubscription}
             onOpenChange={setShowSubscription}
-            premiumEmail="hilwitz.solutions@gmail.com"
           />
         )}
       </div>

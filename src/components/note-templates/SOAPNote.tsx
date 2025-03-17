@@ -2,7 +2,7 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 
-interface SOAPNoteProps {
+export interface SOAPNoteProps {
   noteContent: string;
   setNoteContent: (content: string) => void;
   readOnly?: boolean;

@@ -9,41 +9,50 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { LogOut } from 'lucide-react';
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface LogoutConfirmationProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-  isLoggingOut: boolean;
+  setOpen: (open: boolean) => void;
 }
 
-const LogoutConfirmation = ({ 
-  open, 
-  onOpenChange, 
-  onConfirm, 
-  isLoggingOut 
-}: LogoutConfirmationProps) => {
+const LogoutConfirmation = ({ open, setOpen }: LogoutConfirmationProps) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged out successfully",
+        description: "You have been logged out of your account",
+      });
+      navigate("/auth");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem logging out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
-            <LogOut className="h-6 w-6 text-red-600 dark:text-red-400" />
-          </div>
-          <AlertDialogTitle className="text-center mt-4">Sign out from MedSync?</AlertDialogTitle>
-          <AlertDialogDescription className="text-center">
-            Are you sure you want to sign out? You'll need to sign in again to access your account.
+          <AlertDialogTitle>Are you sure you want to log out?</AlertDialogTitle>
+          <AlertDialogDescription>
+            You will need to log in again to access your account.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoggingOut}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onConfirm}
-            disabled={isLoggingOut}
-            className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-600"
-          >
-            {isLoggingOut ? "Signing out..." : "Yes, sign out"}
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleLogout} className="bg-blue-600 hover:bg-blue-700">
+            Log Out
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

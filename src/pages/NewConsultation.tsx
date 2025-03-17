@@ -88,6 +88,15 @@ const NewConsultation = () => {
       });
       return;
     }
+
+    if (!noteContent.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter or generate consultation notes",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -123,6 +132,7 @@ const NewConsultation = () => {
         .single();
       
       if (error) {
+        console.error("Supabase insert error:", error);
         throw error;
       }
       
@@ -172,14 +182,21 @@ const NewConsultation = () => {
       });
 
       if (error) {
+        console.error("Supabase function error:", error);
         throw new Error(error.message);
       }
 
       if (data.error) {
+        console.error("Gemini API error:", data.error);
         throw new Error(data.error);
       }
 
-      setNoteContent(data.note || "");
+      if (!data.note) {
+        throw new Error("No note content received from API");
+      }
+
+      console.log("Setting note content:", data.note.substring(0, 100) + "...");
+      setNoteContent(data.note);
 
       toast({
         title: "Success",

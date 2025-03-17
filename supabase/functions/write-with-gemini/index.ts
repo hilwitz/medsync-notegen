@@ -64,19 +64,21 @@ serve(async (req) => {
       }),
     })
 
-    const data = await response.json()
-    
     if (!response.ok) {
-      console.error('Gemini API error response:', data)
-      const errorMessage = data.error?.message || 'Failed to generate content with Gemini'
+      const errorData = await response.json()
+      console.error('Gemini API error response:', errorData)
+      const errorMessage = errorData.error?.message || 'Failed to generate content with Gemini'
       throw new Error(errorMessage)
     }
 
+    const data = await response.json()
+    
     // Extract content from Gemini response
     let generatedText = ''
     
     if (data.candidates && data.candidates[0]?.content?.parts?.length > 0) {
       generatedText = data.candidates[0].content.parts[0].text
+      console.log('Generated text:', generatedText.substring(0, 100) + '...')
     } else {
       throw new Error('Invalid response format from Gemini API')
     }

@@ -153,7 +153,6 @@ ${sections.assessment}
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
             spellCheck="false"
-            // Remove any whitespace preprocessing
           />
         </TabsContent>
         
@@ -165,7 +164,6 @@ ${sections.assessment}
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
             spellCheck="false"
-            // Remove any whitespace preprocessing
           />
         </TabsContent>
         
@@ -179,7 +177,6 @@ ${sections.assessment}
               className="min-h-[150px] p-4 font-mono"
               readOnly={readOnly}
               spellCheck="false"
-              // Remove any whitespace preprocessing
             />
             
             <h4>Medications</h4>
@@ -190,7 +187,6 @@ ${sections.assessment}
               className="min-h-[100px] p-4 font-mono"
               readOnly={readOnly}
               spellCheck="false"
-              // Remove any whitespace preprocessing
             />
             
             <h4>Allergies</h4>
@@ -201,7 +197,6 @@ ${sections.assessment}
               className="min-h-[80px] p-4 font-mono"
               readOnly={readOnly}
               spellCheck="false"
-              // Remove any whitespace preprocessing
             />
             
             <h4>Family History</h4>
@@ -212,7 +207,6 @@ ${sections.assessment}
               className="min-h-[80px] p-4 font-mono"
               readOnly={readOnly}
               spellCheck="false"
-              // Remove any whitespace preprocessing
             />
             
             <h4>Social History</h4>
@@ -223,7 +217,6 @@ ${sections.assessment}
               className="min-h-[80px] p-4 font-mono"
               readOnly={readOnly}
               spellCheck="false"
-              // Remove any whitespace preprocessing
             />
             
             <h4>Review of Systems</h4>
@@ -234,7 +227,6 @@ ${sections.assessment}
               className="min-h-[150px] p-4 font-mono"
               readOnly={readOnly}
               spellCheck="false"
-              // Remove any whitespace preprocessing
             />
           </div>
         </TabsContent>
@@ -247,7 +239,6 @@ ${sections.assessment}
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
             spellCheck="false"
-            // Remove any whitespace preprocessing
           />
         </TabsContent>
         
@@ -259,7 +250,6 @@ ${sections.assessment}
             className="min-h-[300px] p-4 font-mono"
             readOnly={readOnly}
             spellCheck="false"
-            // Remove any whitespace preprocessing
           />
         </TabsContent>
       </Tabs>

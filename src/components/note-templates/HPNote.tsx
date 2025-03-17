@@ -5,9 +5,10 @@ import { Card } from "@/components/ui/card";
 interface HPNoteProps {
   noteContent: string;
   setNoteContent: (content: string) => void;
+  readOnly?: boolean;
 }
 
-const HPNote = ({ noteContent, setNoteContent }: HPNoteProps) => {
+const HPNote = ({ noteContent, setNoteContent, readOnly = false }: HPNoteProps) => {
   // Parse the content if it exists
   let history = '';
   let physical = '';
@@ -53,44 +54,56 @@ ${plan}`;
         <Textarea
           value={history}
           onChange={(e) => {
-            history = e.target.value;
-            updateNoteContent();
+            if (!readOnly) {
+              history = e.target.value;
+              updateNoteContent();
+            }
           }}
           placeholder="Enter patient's history, including chief complaint, HPI, past medical history, medications, allergies, family history, social history, etc."
           className="min-h-[150px] mb-4"
+          readOnly={readOnly}
         />
 
         <label className="block text-sm font-medium mb-2">Physical Examination</label>
         <Textarea
           value={physical}
           onChange={(e) => {
-            physical = e.target.value;
-            updateNoteContent();
+            if (!readOnly) {
+              physical = e.target.value;
+              updateNoteContent();
+            }
           }}
           placeholder="Enter physical examination findings, including vitals, general appearance, and system-specific findings."
           className="min-h-[150px] mb-4"
+          readOnly={readOnly}
         />
 
         <label className="block text-sm font-medium mb-2">Assessment</label>
         <Textarea
           value={assessment}
           onChange={(e) => {
-            assessment = e.target.value;
-            updateNoteContent();
+            if (!readOnly) {
+              assessment = e.target.value;
+              updateNoteContent();
+            }
           }}
           placeholder="Enter your assessment, diagnoses, clinical impressions, etc."
           className="min-h-[100px] mb-4"
+          readOnly={readOnly}
         />
 
         <label className="block text-sm font-medium mb-2">Plan</label>
         <Textarea
           value={plan}
           onChange={(e) => {
-            plan = e.target.value;
-            updateNoteContent();
+            if (!readOnly) {
+              plan = e.target.value;
+              updateNoteContent();
+            }
           }}
           placeholder="Enter your treatment plan, medications, follow-up, etc."
           className="min-h-[100px]"
+          readOnly={readOnly}
         />
       </Card>
     </div>

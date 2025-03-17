@@ -51,19 +51,27 @@ const SubscriptionConfirmation = ({ open, onOpenChange, plan }: SubscriptionConf
             ? addMonths(new Date(), 1) 
             : addYears(new Date(), 1);
           
-          // Store subscription info in your database
-          const { error } = await supabase
-            .from('user_subscriptions')
-            .upsert({
+          // Store subscription info in your database using the REST API directly
+          // since the user_subscriptions table might not be accessible via the client
+          const response = await fetch(`${supabase.auth.getSession().then(res => res.data.session?.access_token)}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            },
+            body: JSON.stringify({
               user_id: user.id,
               plan_type: plan,
               is_active: true,
               subscribed_at: new Date().toISOString(),
               expires_at: subscriptionEndDate.toISOString(),
               order_id: orderId
-            });
-            
-          if (error) throw error;
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to store subscription');
+          }
           
           toast({
             title: "Payment successful!",

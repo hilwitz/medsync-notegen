@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Sidebar, SidebarGroup, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Sidebar, SidebarGroup, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { User, FilePenLine, Users, Settings, Home, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,12 @@ const DashboardSidebar = () => {
               } rounded-md transition-colors mb-1`
             }
           >
-            <SidebarMenuItem icon={Home} label="Dashboard" />
+            <SidebarMenuItem>
+              <SidebarMenuButton>
+                <Home className="mr-2 h-4 w-4" />
+                <span>Dashboard</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </NavLink>
           
           <NavLink
@@ -52,7 +57,12 @@ const DashboardSidebar = () => {
               } rounded-md transition-colors mb-1`
             }
           >
-            <SidebarMenuItem icon={FilePenLine} label="Notes" />
+            <SidebarMenuItem>
+              <SidebarMenuButton>
+                <FilePenLine className="mr-2 h-4 w-4" />
+                <span>Notes</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </NavLink>
           
           <NavLink
@@ -63,7 +73,12 @@ const DashboardSidebar = () => {
               } rounded-md transition-colors mb-1`
             }
           >
-            <SidebarMenuItem icon={Users} label="Patients" />
+            <SidebarMenuItem>
+              <SidebarMenuButton>
+                <Users className="mr-2 h-4 w-4" />
+                <span>Patients</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </NavLink>
           
           <NavLink
@@ -74,14 +89,24 @@ const DashboardSidebar = () => {
               } rounded-md transition-colors mb-1`
             }
           >
-            <SidebarMenuItem icon={Settings} label="Settings" />
+            <SidebarMenuItem>
+              <SidebarMenuButton>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </NavLink>
           
           <button
             onClick={() => setShowLogoutDialog(true)}
             className="flex items-center p-3 text-gray-700 hover:bg-gray-50 rounded-md transition-colors mb-1 w-full"
           >
-            <SidebarMenuItem icon={LogOut} label="Logout" />
+            <SidebarMenuItem>
+              <SidebarMenuButton>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Logout</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </button>
         </SidebarGroup>
       </Sidebar>

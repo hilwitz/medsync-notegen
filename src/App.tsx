@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +19,7 @@ import Features from "./pages/Features";
 import VerifyEmail from "./pages/VerifyEmail";
 import SubscriptionManager from "./components/SubscriptionManager";
 import { useToast } from "./hooks/use-toast";
+import { AuthProvider } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +33,6 @@ const App = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
@@ -43,7 +42,6 @@ const App = () => {
       setLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
@@ -58,7 +56,6 @@ const App = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Check subscription status when app loads
   useEffect(() => {
     const checkForNotifications = async () => {
       if (session?.user?.id) {
@@ -70,7 +67,6 @@ const App = () => {
           if (!error && data) {
             setIsPremium(data.isSubscribed);
             
-            // Show notification for expiring subscription
             if (data.isSubscribed && data.notificationDue) {
               toast({
                 title: "Subscription Expiring Soon",
@@ -109,7 +105,6 @@ const App = () => {
 
   const checkLimits = async (userId: string) => {
     try {
-      // Count patients
       const { count: pCount, error: pError } = await supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
@@ -119,7 +114,6 @@ const App = () => {
         setPatientsCount(pCount || 0);
       }
       
-      // Count consultations
       const { count: cCount, error: cError } = await supabase
         .from('consultations')
         .select('*', { count: 'exact', head: true })
@@ -133,7 +127,6 @@ const App = () => {
     }
   };
 
-  // Check if user has reached limits before allowing new items
   const checkSubscriptionLimits = (type: 'patient' | 'consultation') => {
     if (isPremium) return true;
     
@@ -160,7 +153,6 @@ const App = () => {
     return true;
   };
 
-  // Protected route component with email verification check
   const ProtectedRoute = ({ children, pageType }: { children: React.ReactNode, pageType?: 'new-patient' | 'new-consultation' | undefined }) => {
     if (loading) {
       return (
@@ -174,7 +166,6 @@ const App = () => {
       return <Navigate to="/auth" replace />;
     }
 
-    // Check if the user's email is verified
     const userEmail = session.user?.email;
     const isEmailVerified = session.user?.email_confirmed_at || userEmail === "hilwitz.solutions@gmail.com";
     
@@ -182,7 +173,6 @@ const App = () => {
       return <Navigate to="/verify-email" replace />;
     }
     
-    // Check subscription limits for specific pages
     if (pageType === 'new-patient' && !checkSubscriptionLimits('patient')) {
       return <Navigate to="/patients" replace />;
     }
@@ -204,7 +194,6 @@ const App = () => {
     );
   };
 
-  // Check if user is logged in for root route
   const HomeRoute = () => {
     if (loading) {
       return (
@@ -225,63 +214,63 @@ const App = () => {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<HomeRoute />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
-              <Route path="/features" element={<Features />} />
-              <Route path="/free-trial" element={<Navigate to="/auth" />} />
-              
-              {/* Protected Routes */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/consultations/new" element={
-                <ProtectedRoute pageType="new-consultation">
-                  <NewConsultation />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/consultations/:id" element={
-                <ProtectedRoute>
-                  <ConsultationDetail />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/patients" element={
-                <ProtectedRoute>
-                  <Patients />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/patients/:id" element={
-                <ProtectedRoute>
-                  <Patients />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              
-              {/* Catch-all route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+          <AuthProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<HomeRoute />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/features" element={<Features />} />
+                <Route path="/free-trial" element={<Navigate to="/auth" />} />
+                
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/consultations/new" element={
+                  <ProtectedRoute pageType="new-consultation">
+                    <NewConsultation />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/consultations/:id" element={
+                  <ProtectedRoute>
+                    <ConsultationDetail />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/patients" element={
+                  <ProtectedRoute>
+                    <Patients />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/patients/:id" element={
+                  <ProtectedRoute>
+                    <Patients />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/settings" element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </AuthProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
